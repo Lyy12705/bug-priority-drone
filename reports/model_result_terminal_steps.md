@@ -10,6 +10,14 @@ cd /Users/linyaying/Documents/bug-priority-drone-v2
 
 ## 2. 查看目前最佳模型結果
 
+只顯示主要指標：
+
+```bash
+python3 scripts/show_model_metrics.py
+```
+
+查看原始 CSV 與完整各類別分類報告：
+
 ```bash
 cat reports/improved_priority_p2_keywords_eval.csv
 cat reports/improved_priority_p2_keywords_class_report.csv

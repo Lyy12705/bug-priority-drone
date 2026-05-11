@@ -57,6 +57,12 @@
 ```bash
 cd /Users/linyaying/Documents/bug-priority-drone-v2
 
+python3 scripts/show_model_metrics.py
+```
+
+若要查看原始 CSV 與完整分類報告：
+
+```bash
 cat reports/improved_priority_p2_keywords_eval.csv
 cat reports/improved_priority_p2_keywords_class_report.csv
 cat reports/improved_priority_experiment_summary.md
