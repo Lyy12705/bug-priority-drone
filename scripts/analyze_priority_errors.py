@@ -110,6 +110,20 @@ def predict_model_or_bundle(model_or_bundle, X) -> np.ndarray:
         if refine_mask.any():
             y_pred[refine_mask] = model_or_bundle["boundary_model"].predict(X[refine_mask]).astype(int)
         return y_pred
+    if model_type == "recall_balanced_boundary_suppression":
+        y_pred = model_or_bundle["base_model"].predict(X).astype(int)
+        p1p2_model = model_or_bundle.get("p1p2_model")
+        if p1p2_model is not None:
+            p1p2_mask = np.isin(y_pred, [1, 2])
+            if p1p2_mask.any():
+                y_pred[p1p2_mask] = p1p2_model.predict(X[p1p2_mask]).astype(int)
+        p2p4_model = model_or_bundle.get("p2p4_model")
+        if p2p4_model is not None:
+            p2_mask = y_pred == 2
+            if p2_mask.any():
+                p2p4_pred = p2p4_model.predict(X[p2_mask]).astype(int)
+                y_pred[p2_mask] = np.where(p2p4_pred == 4, 4, y_pred[p2_mask])
+        return y_pred
 
     raise TypeError(
         "Expected a model bundle produced by scripts/train_drone_gray.py "
