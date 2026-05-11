@@ -1,6 +1,6 @@
-# Model Result Terminal Steps
+# 查看模型結果的終端機步驟
 
-本文件記錄如何在終端機查看目前最佳模型的優先級判定結果。目前最佳模型已更新為 `improved_priority_p2_keywords_model`，它在 BM25/BM25F boundary model 上加入 P2 error-driven keyword features 與 boundary objective 調整。
+本文件記錄如何在終端機查看目前最佳模型的優先級判定結果。目前最佳模型為 `improved_priority_p2_keywords_model`，它在 BM25/BM25F boundary model 上加入 P2 error-driven keyword features 與 boundary objective 調整。
 
 ## 1. 進入專案資料夾
 
@@ -37,9 +37,9 @@ print(df[cols].to_string(index=False))
 PY
 ```
 
-目前 natural holdout 結果：
+目前 `natural_holdout` 結果：
 
-| Metric | Value |
+| 指標 | 數值 |
 |---|---:|
 | Accuracy | 0.7246 |
 | Macro F1 | 0.7240 |
@@ -59,18 +59,18 @@ cat reports/improved_priority_comparison.csv
 cat reports/improved_priority_p2_keywords_grid_search.md
 ```
 
-## 5. 查看先前 P2 錯誤分析
+## 5. 查看 P2 錯誤分析
 
-查看真實 P2 被錯判成 P1 或 P3 的案例摘要：
+查看改良後真實 P2 被錯判成 P1 或 P3 的案例摘要：
 
 ```bash
-cat reports/p2_error_analysis_bm25_boundary_best_summary.md
+cat reports/p2_error_analysis_improved_priority_p2_keywords_summary.md
 ```
 
 查看人工分類後的錯誤類型：
 
 ```bash
-cat reports/p2_error_manual_categories_bm25_boundary_best.md
+cat reports/p2_error_manual_categories_improved_priority_p2_keywords.md
 ```
 
 ## 6. 重新產生目前最佳模型
@@ -118,4 +118,4 @@ python3 scripts/grid_search_bm25_boundary.py \
 
 本研究先依據 DRONE/GRAY 建立六類因素，包含 textual、temporal、author、related-report、severity、product/component。接著利用 Bugzilla 的 `dupe_of` 欄位訓練 REP- related-report 權重，並進一步調整 BM25/BM25F 中 summary 與 description 的欄位權重。最後根據 P2 錯誤分析加入 keyword features，並使用 P1/P2/P3 boundary refiner 改善 P2 容易被判成 P1 或 P3 的問題。
 
-目前最佳模型是 `improved_priority_p2_keywords_model`，在 natural holdout 上 accuracy 為 `0.7246`，macro F1 為 `0.7240`，P2 recall 為 `0.6818`。
+目前最佳模型是 `improved_priority_p2_keywords_model`，在 `natural_holdout` 上 accuracy 為 `0.7246`，macro F1 為 `0.7240`，P2 recall 為 `0.6818`。

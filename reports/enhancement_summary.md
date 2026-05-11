@@ -1,8 +1,8 @@
-# DRONE/GRAY Enhancement Summary
+# DRONE/GRAY 改良摘要
 
 本次改善目標是提升 P2 recall，並避免單純提高全域 P2 權重時造成 P1 recall 崩落。
 
-## Implemented Changes
+## 已實作的改良
 
 - 調整資料切分：`natural-test-size=0.1`，balanced train 每類 1200 筆，validation/test 每類 250 筆。
 - 加強文字特徵：保留文獻式 TF textual factor，新增 TF-IDF unigram/bigram 片語特徵。
@@ -13,7 +13,7 @@
 - High splitter objective 同時重視 P1 recall 與 P2 recall，並懲罰過度預測 P2。
 - 輸出 P2 error analysis：真實 P2 但預測為 P1/P3 的案例。
 
-## Key Results
+## 主要結果
 
 | Model | Split | Accuracy | Macro F1 | P1 Recall | P2 Recall | Off-by-1 |
 |---|---|---:|---:|---:|---:|---:|
@@ -24,13 +24,13 @@
 | Single GRAY + P2 weight | Natural holdout | 0.482 | 0.475 | 0.719 | 0.310 | 0.855 |
 | Hierarchical GRAY | Natural holdout | 0.502 | 0.509 | 0.508 | 0.523 | 0.847 |
 
-## Interpretation
+## 結果判讀
 
-Hierarchical DRONE/GRAY gives the clearest P2 recall improvement. On balanced test, P2 recall improves from 0.244 to 0.396. On natural holdout, P2 recall improves from 0.259 to 0.523, while macro F1 also improves from 0.465 to 0.509.
+Hierarchical DRONE/GRAY 對 P2 recall 有最明顯的改善。在 balanced test 中，P2 recall 從 0.244 提升到 0.396。在 natural holdout 中，P2 recall 從 0.259 提升到 0.523，macro F1 也從 0.465 提升到 0.509。
 
-The tradeoff is lower P1 recall because the high-priority splitter now separates some tickets previously predicted as P1 into P2. This is expected and is more balanced than the earlier aggressive threshold-only P2 profile, which recovered P2 by almost collapsing P1.
+代價是 P1 recall 下降，因為 high-priority splitter 會把部分原本預測為 P1 的 ticket 改判為 P2。這是可預期的 trade-off，也比單純調 threshold 導致 P1 幾乎崩掉的做法更平衡。
 
-## Generated Files
+## 產出檔案
 
 - `models/hierarchical_drone_gray_model.joblib`
 - `reports/hierarchical_drone_gray_report.csv`

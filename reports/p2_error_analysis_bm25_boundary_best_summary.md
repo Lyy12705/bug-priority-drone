@@ -1,22 +1,22 @@
-# Boundary Error Analysis Summary
+# 邊界錯誤分析摘要
 
-- True labels inspected: `[2]`
-- Predicted labels selected: `[1, 3]`
-- True-label rows: `198`
-- Selected boundary errors: `50`
+- 檢查的真實標籤：`[2]`
+- 選取的預測標籤：`[1, 3]`
+- 真實標籤資料筆數：`198`
+- 選取的邊界錯誤筆數：`50`
 
-## Predicted Label Counts
+## 預測標籤統計
 
 - `P1 Blocker`: 34
 - `P3 Major`: 16
 
-## Top Products In Selected Errors
+## 錯誤案例中最常見的 Product
 
 - `platform`: 25
 - `jdt`: 23
 - `pde`: 2
 
-## Top Components In Selected Errors
+## 錯誤案例中最常見的 Component
 
 - `ui`: 18
 - `debug`: 13
@@ -27,14 +27,14 @@
 - `resources`: 1
 - `build`: 1
 
-## Top Severities In Selected Errors
+## 錯誤案例中最常見的 Severity
 
 - `normal`: 33
 - `major`: 13
 - `enhancement`: 3
 - `minor`: 1
 
-## Keyword Signals With Higher Error Rates
+## 錯誤率較高的 Keyword Signals
 
 | keyword_feature                  |   selected_error_rate |   true_label_rate |   difference |
 |:---------------------------------|----------------------:|------------------:|-------------:|

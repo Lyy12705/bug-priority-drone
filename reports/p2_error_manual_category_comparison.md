@@ -1,4 +1,4 @@
-# P2 Error Manual Category Comparison
+# P2 錯誤人工分類比較
 
 本文件比較 boundary-refined improved 與 BM25/BM25F tuned boundary model 的剩餘 P2 邊界錯誤。
 

@@ -1,15 +1,15 @@
-# Boundary Constraint Grid Search
+# 邊界分類器限制條件搜尋
 
-This experiment tunes the P1/P2/P3 boundary classifier objective with explicit constraints.
+本實驗針對 P1/P2/P3 boundary classifier 的 objective 加入明確限制條件。
 
-Constraints tested:
+測試的限制條件：
 
-- Increase P2 recall weight.
-- Require validation P1 recall above a floor.
-- Require validation P3 recall above a floor.
-- Limit validation accuracy drop from the base direct classifier.
+- 提高 P2 recall 權重。
+- 要求 validation P1 recall 不低於指定下限。
+- 要求 validation P3 recall 不低於指定下限。
+- 限制相較於 base direct classifier 的 validation accuracy 下降幅度。
 
-## Base Direct Natural Holdout
+## Base Direct Natural Holdout 結果
 
 - Accuracy: `0.6995`
 - Macro F1: `0.6990`
@@ -17,7 +17,7 @@ Constraints tested:
 - P2 recall: `0.5859`
 - P3 recall: `0.8150`
 
-## Best Natural Holdout Candidate
+## 最佳 Natural Holdout 候選
 
 - P2 weight: `0.0`
 - P1 floor: `0.0`
@@ -32,7 +32,7 @@ Constraints tested:
 - P2 recall: `0.6364`
 - P3 recall: `0.8500`
 
-## Top Grid Results
+## 前幾名搜尋結果
 
 |   rank |   p2_weight |   p1_floor |   p3_floor |   max_accuracy_drop | boundary_apply   | boundary_params   | constraint_status   |   natural_accuracy |   natural_macro_f1 |   natural_p1_recall |   natural_p2_recall |   natural_p3_recall |   natural_mae |
 |-------:|------------:|-----------:|-----------:|--------------------:|:-----------------|:------------------|:--------------------|-------------------:|-------------------:|--------------------:|--------------------:|--------------------:|--------------:|
@@ -49,7 +49,7 @@ Constraints tested:
 |     11 |           0 |          0 |       0.8  |               0.01  | base_1_2         | alpha=0.1         | feasible            |             0.7116 |             0.7106 |              0.6683 |              0.6364 |                0.85 |        0.4291 |
 |     12 |           0 |          0 |       0.8  |               0.02  | base_1_2         | alpha=0.1         | feasible            |             0.7116 |             0.7106 |              0.6683 |              0.6364 |                0.85 |        0.4291 |
 
-## Candidate Pool
+## 候選模型池
 
 | boundary_apply   | boundary_model_type   | boundary_params   |   validation_accuracy |   validation_macro_f1 |   validation_p1_recall |   validation_p2_recall |   validation_p3_recall |   natural_accuracy |   natural_macro_f1 |   natural_p1_recall |   natural_p2_recall |   natural_p3_recall |
 |:-----------------|:----------------------|:------------------|----------------------:|----------------------:|-----------------------:|-----------------------:|-----------------------:|-------------------:|-------------------:|--------------------:|--------------------:|--------------------:|

@@ -1,10 +1,10 @@
-# BM25 / BM25F Boundary Grid Search
+# BM25 / BM25F 邊界模型參數搜尋
 
-This experiment tests a small set of BM25F field-weight and normalization settings.
+本實驗測試多組 BM25F 欄位權重與 normalization 參數。
 
-Each config retrains REP- weights from duplicate links, rebuilds improved DRONE/REP- features, then evaluates the boundary-refined model.
+每一組設定都會使用 duplicate links 重新訓練 REP- 權重，重建 DRONE/REP- 特徵，並評估 boundary-refined model。
 
-## Best Config
+## 最佳設定
 
 - Config: `summary_high`
 - Accuracy: `0.7116`
@@ -12,7 +12,7 @@ Each config retrains REP- weights from duplicate links, rebuilds improved DRONE/
 - P2 recall: `0.6515`
 - MAE: `0.4302`
 
-## All Configs
+## 所有設定結果
 
 | config_name          |   refined_accuracy |   refined_macro_f1 |   refined_p1_recall |   refined_p2_recall |   refined_p3_recall |   refined_mae |   rep_product_weight |   rep_component_weight |   rep_severity_weight |
 |:---------------------|-------------------:|-------------------:|--------------------:|--------------------:|--------------------:|--------------:|---------------------:|-----------------------:|----------------------:|

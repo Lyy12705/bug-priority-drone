@@ -1,19 +1,19 @@
-# Final Integrated Priority Model Report
+# Final Integrated Priority Model 報告
 
-- Feature profile: `literature`
-- Profile meaning: TF-only DRONE/REP- features; selected as the final integrated model profile.
-- Selected classifier: `sgd_log (alpha=0.01)`
-- Validation selection metric: `guarded_macro`
+- Feature profile：`literature`
+- Profile 說明：TF-only DRONE/REP- features，曾作為 final integrated model profile。
+- 選定分類器：`sgd_log (alpha=0.01)`
+- Validation selection metric：`guarded_macro`
 
-## Evaluation Results
+## 評估結果
 
 | eval_set        |   rows |   accuracy |   macro_f1 |   off_by_one_accuracy |    mae |   p1_recall |   p2_recall |   p3_recall |   p4_recall |   p5_recall |
 |:----------------|-------:|-----------:|-----------:|----------------------:|-------:|------------:|------------:|------------:|------------:|------------:|
 | natural_holdout |    995 |     0.7015 |     0.7008 |                0.8985 | 0.4442 |      0.6734 |      0.5909 |       0.825 |      0.6633 |      0.7538 |
 
-## Validation Candidate Ranking
+## Validation 候選模型排序
 
-The final classifier is selected from the validation set before testing.
+Final classifier 會先在 validation set 上選定，再進行測試。
 
 | candidate_model_type   | candidate_params   |   selection_score |   accuracy |   macro_f1 |   off_by_one_accuracy |   p1_recall |   p2_recall |   p3_recall |   p4_recall |   p5_recall |
 |:-----------------------|:-------------------|------------------:|-----------:|-----------:|----------------------:|------------:|------------:|------------:|------------:|------------:|
@@ -23,7 +23,7 @@ The final classifier is selected from the validation set before testing.
 | linear_svm             | C=0.1              |            0.6342 |     0.6344 |     0.6342 |                0.8728 |       0.556 |       0.512 |       0.784 |       0.6   |       0.72  |
 | sgd_log                | alpha=1.0          |            0.6268 |     0.64   |     0.6268 |                0.8584 |       0.612 |       0.568 |       0.956 |       0.36  |       0.704 |
 
-## Per-Priority Classification Report
+## 各 Priority 分類報告
 
 | eval_set        | priority   | label       |   precision |   recall |     f1 |   support |
 |:----------------|:-----------|:------------|------------:|---------:|-------:|----------:|
@@ -33,7 +33,7 @@ The final classifier is selected from the validation set before testing.
 | natural_holdout | P4         | P4 Minor    |      0.6839 |   0.6633 | 0.6735 |       199 |
 | natural_holdout | P5         | P5 Trivial  |      0.8021 |   0.7538 | 0.7772 |       199 |
 
-## Recall Interpretation
+## Recall 指標判讀
 
 - `p1_recall` 到 `p5_recall` 分別代表真實 P1-P5 被模型正確抓出的比例。
 - `precision` 代表模型預測成該 priority 時，有多少比例真的屬於該 priority。
@@ -42,11 +42,11 @@ The final classifier is selected from the validation set before testing.
 - `off_by_one_accuracy` 代表預測 priority 只差一級時也視為可接受的比例，適合 priority 這種序位任務。
 - `mae` 是預測 priority 與真實 priority 的平均距離，越低代表錯誤越接近真實等級。
 
-## Confusion Matrices
+## 混淆矩陣
 
 ### natural_holdout
 
-Rows are true labels P1-P5; columns are predicted labels P1-P5.
+列為真實 P1-P5，欄為預測 P1-P5。
 
 ```text
 [[134  49  10   3   3]

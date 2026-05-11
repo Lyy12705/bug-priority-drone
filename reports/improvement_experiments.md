@@ -1,4 +1,4 @@
-# Improvement Experiments
+# 改良實驗紀錄
 
 本文件記錄針對老師建議進行的三個改良方向：P2 邊界分類、REP- related-report 特徵、文字關鍵詞特徵。
 
@@ -28,7 +28,7 @@
 - Macro F1 從 `0.6990` 提升到 `0.7106`。
 - P1 recall 稍微下降，但 P2/P3 與整體表現都有改善。
 
-## 1b. Boundary Objective Constraint Search
+## 1b. Boundary Objective 限制條件搜尋
 
 新增 `scripts/grid_search_boundary_constraints.py`。
 
@@ -60,7 +60,7 @@ BM25 summary-high feature profile 結果：
 - 如果強制保留較高 P1 recall，P2 recall 會下降，形成明顯 trade-off。
 - BM25 summary-high feature profile 仍是目前最佳整體結果，P2 recall 為 `0.6515`。
 
-## 2. 調整 REP- Related-report 特徵
+## 2. 調整 REP- related-report 特徵
 
 更新 `scripts/train_rep_minus_weights.py` 與 `scripts/build_features.py`。
 
@@ -134,7 +134,7 @@ BM25 summary-high feature profile 結果：
 - 這表示 bug report 的 summary 對 P1/P2/P3 邊界判斷有幫助。
 - 強化或弱化長度正規化沒有帶來更好結果。
 
-## 3. 加強文字與 Error-driven Features
+## 3. 加強文字與 error-driven features
 
 更新 `scripts/build_features.py`。
 

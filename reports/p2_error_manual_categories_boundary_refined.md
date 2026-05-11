@@ -1,17 +1,17 @@
-# P2 Boundary Error Manual Categories
+# P2 邊界錯誤人工分類
 
-- Model: `boundary_refined_improved`
-- Selected errors: `53`
-- Scope: true P2 predicted as P1 or P3
+- 模型：`boundary_refined_improved`
+- 選取錯誤筆數：`53`
+- 範圍：真實 P2 但預測成 P1 或 P3
 
-## Error Direction
+## 錯誤方向
 
 | direction         |   count |   percent |
 |:------------------|--------:|----------:|
 | P2 -> P1 判太嚴重 |      37 |    0.6981 |
 | P2 -> P3 判太輕   |      16 |    0.3019 |
 
-## Manual Primary Categories
+## 主要人工分類
 
 | primary_category                                       |   count |   percent |
 |:-------------------------------------------------------|--------:|----------:|
@@ -21,7 +21,7 @@
 | P2->P1：一般判太嚴重                                   |       5 |    0.0943 |
 | P2->P1：crash/block/data-loss 等高影響詞讓模型判太嚴重 |       1 |    0.0189 |
 
-## Multi-label Category Flags
+## 多標籤分類 Flags
 
 | category                      |   count |   percent |
 |:------------------------------|--------:|----------:|
@@ -43,42 +43,42 @@
 | has_api_break_terms_any       |       2 |    0.0377 |
 | has_regression_terms_any      |       0 |    0      |
 
-## Direction x Severity
+## 錯誤方向 x Severity
 
 | error_direction   |   enhancement |   major |   minor |   normal |   total |
 |:------------------|--------------:|--------:|--------:|---------:|--------:|
 | P2 -> P1 判太嚴重 |             1 |      14 |       0 |       22 |      37 |
 | P2 -> P3 判太輕   |             2 |       0 |       1 |       13 |      16 |
 
-## Direction x Product
+## 錯誤方向 x Product
 
 | error_direction   |   jdt |   pde |   platform |   total |
 |:------------------|------:|------:|-----------:|--------:|
 | P2 -> P1 判太嚴重 |    14 |     2 |         21 |      37 |
 | P2 -> P3 判太輕   |    10 |     0 |          6 |      16 |
 
-## Direction x Component Focus
+## 錯誤方向 x Component Focus
 
 | error_direction   |   False |   True |   total |
 |:------------------|--------:|-------:|--------:|
 | P2 -> P1 判太嚴重 |      10 |     27 |      37 |
 | P2 -> P3 判太輕   |       1 |     15 |      16 |
 
-## Direction x Stack/Exception
+## 錯誤方向 x Stack/Exception
 
 | error_direction   |   False |   True |   total |
 |:------------------|--------:|-------:|--------:|
 | P2 -> P1 判太嚴重 |      21 |     16 |      37 |
 | P2 -> P3 判太輕   |      14 |      2 |      16 |
 
-## Direction x Related-report Pull
+## 錯誤方向 x Related-report Pull
 
 | error_direction   |   False |   True |   total |
 |:------------------|--------:|-------:|--------:|
 | P2 -> P1 判太嚴重 |      18 |     19 |      37 |
 | P2 -> P3 判太輕   |       1 |     15 |      16 |
 
-## Interpretation
+## 判讀
 
 - `P2 -> P1 判太嚴重` 表示模型把 critical bug 判成 blocker。
 - `P2 -> P3 判太輕` 表示模型把 critical bug 判成 major。

@@ -1,8 +1,8 @@
-# Cross Validation Report
+# 交叉驗證報告
 
-This report evaluates the current final-model classifier with stratified k-fold cross validation.
+本報告使用 stratified k-fold cross validation 評估目前 final-model classifier 的穩定性。
 
-Important: this is a model-building stability check on the existing DRONE/REP- feature matrices. `natural_holdout` remains the final untouched test set.
+注意：這是針對既有 DRONE/REP- feature matrix 的模型穩定性檢查。`natural_holdout` 仍然保留為最終且不參與調參的測試集。
 
 - Model: `sgd_log alpha=0.01`
 - Folds: `5`
@@ -11,7 +11,7 @@ Important: this is a model-building stability check on the existing DRONE/REP- f
   - `data/processed/features_literature_dupe_train`
   - `data/processed/features_literature_dupe_validation`
 
-## Mean / Std
+## 平均值與標準差
 
 | metric                     |   mean |    std |    min |    max |
 |:---------------------------|-------:|-------:|-------:|-------:|
@@ -28,7 +28,7 @@ Important: this is a model-building stability check on the existing DRONE/REP- f
 | p4_recall                  | 0.5814 | 0.0698 | 0.5138 | 0.6621 |
 | p5_recall                  | 0.7476 | 0.0045 | 0.7414 | 0.7517 |
 
-## Fold Results
+## 各 Fold 結果
 
 |   fold |   train_rows |   test_rows |   accuracy |   macro_f1 |   off_by_one_accuracy |    mae |   p1_recall |   p2_recall |   p3_recall |   p4_recall |   p5_recall |
 |-------:|-------------:|------------:|-----------:|-----------:|----------------------:|-------:|------------:|------------:|------------:|------------:|------------:|
@@ -38,9 +38,9 @@ Important: this is a model-building stability check on the existing DRONE/REP- f
 |      4 |         5800 |        1450 |     0.7    |     0.6963 |                0.8986 | 0.4579 |      0.6724 |      0.5241 |      0.9034 |      0.6517 |      0.7483 |
 |      5 |         5800 |        1450 |     0.6986 |     0.6965 |                0.9    | 0.4455 |      0.6414 |      0.5655 |      0.8793 |      0.6621 |      0.7448 |
 
-## Report Interpretation
+## 報告判讀
 
-- `mean` is the average score over all folds.
-- `std` shows how much the score changes when train/test split changes.
-- A small `std` means the result is more stable across different splits.
-- `natural_holdout` should still be used as the final result reported for the model.
+- `mean` 是所有 folds 的平均分數。
+- `std` 表示 train/test 切分改變時，分數波動程度。
+- `std` 越小代表模型在不同切分下越穩定。
+- `natural_holdout` 仍應作為模型最終報告結果。

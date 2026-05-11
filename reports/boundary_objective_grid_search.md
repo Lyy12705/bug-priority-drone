@@ -1,10 +1,10 @@
-# Boundary Objective Grid Search
+# 邊界分類器 Objective 搜尋
 
-This search changes the objective used to select the P1/P2/P3 boundary classifier.
+本實驗調整 P1/P2/P3 boundary classifier 的 selection objective。
 
-The base direct classifier is fixed; only boundary objective settings are compared.
+Base direct classifier 固定不變，只比較 boundary objective 設定。
 
-## Base Natural Holdout
+## Base Natural Holdout 結果
 
 - Accuracy: `0.6995`
 - Macro F1: `0.6990`
@@ -12,7 +12,7 @@ The base direct classifier is fixed; only boundary objective settings are compar
 - P2 recall: `0.5859`
 - P3 recall: `0.8150`
 
-## Best Natural Holdout Candidate
+## 最佳 Natural Holdout 候選
 
 - Boundary apply: `base_1_2`
 - P2 weight: `0.0`
@@ -22,7 +22,7 @@ The base direct classifier is fixed; only boundary objective settings are compar
 - Macro F1: `0.7106`
 - P2 recall: `0.6364`
 
-## Top Candidates
+## 前幾名候選設定
 
 |   rank | boundary_apply   |   p2_weight |   collapse_floor | boundary_model_type   | boundary_params   |   natural_accuracy |   natural_macro_f1 |   natural_p1_recall |   natural_p2_recall |   natural_p3_recall |   natural_mae |   validation_score |
 |-------:|:-----------------|------------:|-----------------:|:----------------------|:------------------|-------------------:|-------------------:|--------------------:|--------------------:|--------------------:|--------------:|-------------------:|

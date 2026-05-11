@@ -1,15 +1,15 @@
-# Boundary Refined Priority Model Report
+# 邊界修正優先級模型報告
 
-This experiment adds a P1/P2/P3 boundary classifier on top of the direct DRONE/REP- classifier.
+本實驗在 direct DRONE/REP- classifier 上加入 P1/P2/P3 boundary classifier。
 
-## Evaluation Results
+## 評估結果
 
 | model_stage      | eval_set        |   rows |   accuracy |   macro_f1 |   off_by_one_accuracy |    mae |   p1_recall |   p2_recall |   p3_recall |   p4_recall |   p5_recall |
 |:-----------------|:----------------|-------:|-----------:|-----------:|----------------------:|-------:|------------:|------------:|------------:|------------:|------------:|
 | base_direct      | natural_holdout |    995 |     0.6995 |     0.699  |                0.8975 | 0.4472 |      0.6935 |      0.5859 |       0.815 |      0.6633 |      0.7387 |
 | boundary_refined | natural_holdout |    995 |     0.7116 |     0.7106 |                0.8975 | 0.4291 |      0.6683 |      0.6364 |       0.85  |      0.6633 |      0.7387 |
 
-## Boundary Candidate Ranking
+## Boundary 候選模型排序
 
 | boundary_model_type   | boundary_params   |   selection_score |   accuracy |   macro_f1 |   p1_recall |   p2_recall |   p3_recall |   off_by_one_accuracy |    mae |
 |:----------------------|:------------------|------------------:|-----------:|-----------:|------------:|------------:|------------:|----------------------:|-------:|
@@ -17,7 +17,7 @@ This experiment adds a P1/P2/P3 boundary classifier on top of the direct DRONE/R
 | sgd_log               | alpha=0.01        |            0.7245 |     0.6776 |     0.6741 |       0.732 |       0.504 |       0.836 |                0.892  | 0.4848 |
 | sgd_log               | alpha=0.001       |            0.6723 |     0.636  |     0.6352 |       0.76  |       0.412 |       0.692 |                0.8768 | 0.5496 |
 
-## Per-Priority Classification Report
+## 各 Priority 分類報告
 
 | eval_set        | priority   | label       |   precision |   recall |     f1 |   support |
 |:----------------|:-----------|:------------|------------:|---------:|-------:|----------:|
@@ -27,11 +27,11 @@ This experiment adds a P1/P2/P3 boundary classifier on top of the direct DRONE/R
 | natural_holdout | P4         | P4 Minor    |      0.6769 |   0.6633 | 0.6701 |       199 |
 | natural_holdout | P5         | P5 Trivial  |      0.7989 |   0.7387 | 0.7676 |       199 |
 
-## Confusion Matrices
+## 混淆矩陣
 
 ### base_direct_natural_holdout
 
-Rows are true P1-P5; columns are predicted P1-P5.
+列為真實 P1-P5，欄為預測 P1-P5。
 
 ```text
 [[138  47   9   3   2]
@@ -43,7 +43,7 @@ Rows are true P1-P5; columns are predicted P1-P5.
 
 ### boundary_refined_natural_holdout
 
-Rows are true P1-P5; columns are predicted P1-P5.
+列為真實 P1-P5，欄為預測 P1-P5。
 
 ```text
 [[133  48  13   3   2]

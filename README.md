@@ -1,27 +1,27 @@
-# Eclipse Bug Priority DRONE/GRAY v2
+# Eclipse Bug Priority DRONE/GRAY 優先級判定專題
 
-This project implements Eclipse Bugzilla bug-priority prediction based on the DRONE/GRAY paper idea, then extends it with duplicate-trained REP- related-report features, BM25/BM25F tuning, and a P1/P2/P3 boundary refiner.
+本專案實作 Eclipse Bugzilla bug report 的 priority prediction。研究方法以 DRONE/GRAY 文獻為基礎，建立 textual、temporal、author、related-report、severity、product/component 六類特徵，並進一步加入 duplicate-trained REP-、BM25/BM25F 欄位權重調整、P1/P2/P3 boundary classifier，以及 P2 錯誤分析導向的 keyword features。
 
-The compact workspace now keeps the current best reproducible model only. Markdown reports are preserved for reporting and explanation.
+目前 GitHub 版本保留可重現實驗所需的程式、報告與輕量權重檔。大型資料集、feature matrix 與 `.joblib` 模型檔已透過 `.gitignore` 排除，避免 repository 過大；需要時可依照本文件指令重新產生。
 
-## Current Best Model
+## 目前最佳模型
 
-| Item | Path |
+| 項目 | 路徑 |
 |---|---|
-| Best model | `models/improved_priority_p2_keywords_model.joblib` |
-| REP- weights | `models/rep_minus_weights_bm25_p2_error_keywords.json` |
-| Train features | `data/processed/features_bm25_p2_error_keywords_train` |
-| Validation features | `data/processed/features_bm25_p2_error_keywords_validation` |
-| Natural holdout features | `data/processed/features_bm25_p2_error_keywords_natural_test` |
-| Main evaluation | `reports/improved_priority_p2_keywords_eval.csv` |
-| P1-P5 classification report | `reports/improved_priority_p2_keywords_class_report.csv` |
-| Improvement summary | `reports/improved_priority_experiment_summary.md` |
+| 最佳模型 | `models/improved_priority_p2_keywords_model.joblib` |
+| REP- 權重 | `models/rep_minus_weights_bm25_p2_error_keywords.json` |
+| 訓練特徵 | `data/processed/features_bm25_p2_error_keywords_train` |
+| 驗證特徵 | `data/processed/features_bm25_p2_error_keywords_validation` |
+| 最終測試特徵 | `data/processed/features_bm25_p2_error_keywords_natural_test` |
+| 主要評估結果 | `reports/improved_priority_p2_keywords_eval.csv` |
+| 各類別分類報告 | `reports/improved_priority_p2_keywords_class_report.csv` |
+| 改良實驗摘要 | `reports/improved_priority_experiment_summary.md` |
 
-## Current Result
+## 目前最佳結果
 
-Natural holdout evaluation:
+評估資料集為 `natural_holdout`，也就是不參與訓練與調參的最終測試資料。
 
-| Metric | Value |
+| 指標 | 數值 |
 |---|---:|
 | Accuracy | 0.7246 |
 | Macro F1 | 0.7240 |
@@ -33,18 +33,36 @@ Natural holdout evaluation:
 | P4 recall | 0.6834 |
 | P5 recall | 0.7337 |
 
-## View Results
+和前一版最佳模型相比：
+
+| 模型 | Accuracy | Macro F1 | P2 recall | MAE |
+|---|---:|---:|---:|---:|
+| 舊最佳 BM25 boundary | 0.7116 | 0.7108 | 0.6515 | 0.4302 |
+| 新最佳 p2 keywords SGD | 0.7246 | 0.7240 | 0.6818 | 0.4090 |
+
+## 專案流程
+
+1. 從 Eclipse Bugzilla 抓取 P1-P5 bug report，並保留 `dupe_of` 欄位。
+2. 清洗 `summary`、第一則 comment 作為 `description`、類別欄位與建立時間。
+3. 建立 `train_balanced`、`validation_balanced`、`natural_holdout` 三種資料切分。
+4. 建立 DRONE 六類特徵：文字、時間、作者、相關報告、嚴重度、產品/元件。
+5. 使用 duplicate bug links 訓練 REP- related-report 權重。
+6. 調整 BM25/BM25F summary、description、unigram、bigram 欄位權重。
+7. 使用 P1/P2/P3 boundary classifier 改善 P2 容易被判成 P1 或 P3 的問題。
+8. 針對 P2 剩餘錯誤加入 keyword features，重新比較模型表現。
+9. 在 `natural_holdout` 上報告 accuracy、macro F1、off-by-one accuracy、MAE 與 P1-P5 recall。
+
+## 查看目前結果
 
 ```bash
 cd /Users/linyaying/Documents/bug-priority-drone-v2
 
 cat reports/improved_priority_p2_keywords_eval.csv
 cat reports/improved_priority_p2_keywords_class_report.csv
-cat reports/improved_priority_p2_keywords_grid_search.md
 cat reports/improved_priority_experiment_summary.md
 ```
 
-Readable metric table:
+用較好讀的表格查看重點指標：
 
 ```bash
 python3 - <<'PY'
@@ -66,11 +84,9 @@ print(df[cols].to_string(index=False))
 PY
 ```
 
-## Reproduce Current Best Result
+## 重新產生資料與模型
 
-### 1. Fetch Eclipse Bugzilla data
-
-The fetcher keeps `dupe_of`, which is needed for REP- training.
+### 1. 抓取 Eclipse Bugzilla 資料
 
 ```bash
 python3 scripts/fetch_eclipse_bugzilla.py \
@@ -78,7 +94,7 @@ python3 scripts/fetch_eclipse_bugzilla.py \
   --output data/raw/eclipse_bugzilla_raw_with_dupe.csv
 ```
 
-### 2. Clean data
+### 2. 清洗資料
 
 ```bash
 python3 scripts/clean_bug_reports.py \
@@ -86,9 +102,9 @@ python3 scripts/clean_bug_reports.py \
   --output data/processed/eclipse_bug_reports_clean_with_dupe.csv
 ```
 
-Cleaning rules are documented in `reports/cleaning_rules.md`.
+詳細清洗規則請見 `reports/cleaning_rules.md`。
 
-### 3. Build train / validation / natural holdout split
+### 3. 建立資料切分
 
 ```bash
 python3 scripts/build_experiment_splits.py \
@@ -100,124 +116,65 @@ python3 scripts/build_experiment_splits.py \
   --balanced-test-per-class 250
 ```
 
-### 4. Train duplicate-based REP- weights
+### 4. 重新訓練目前最佳改良模型
 
-This version is the best BM25/BM25F setting found in the experiments. Summary text is weighted higher than description text.
-
-```bash
-python3 scripts/train_rep_minus_weights.py \
-  --input data/processed/eclipse_bug_reports_clean_with_dupe.csv \
-  --output models/rep_minus_weights_bm25_summary_high.json \
-  --summary-weight 3.0 \
-  --description-weight 0.8 \
-  --bigram-summary-weight 3.0 \
-  --bigram-description-weight 0.8 \
-  --k1-unigram 1.2 \
-  --k1-bigram 1.2 \
-  --summary-b-unigram 0.65 \
-  --summary-b-bigram 0.65 \
-  --description-b-unigram 0.85 \
-  --description-b-bigram 0.85
-```
-
-### 5. Build BM25 summary-high features
-
-Train:
-
-```bash
-python3 scripts/build_features.py \
-  --input data/processed/experiment_splits_with_dupe/train_balanced_clean.csv \
-  --feature-dir data/processed/features_bm25_summary_high_train \
-  --mode fit \
-  --text-feature-mode enhanced \
-  --related-mode rep_minus \
-  --rep-weights-json models/rep_minus_weights_bm25_summary_high.json
-```
-
-Validation:
-
-```bash
-python3 scripts/build_features.py \
-  --input data/processed/experiment_splits_with_dupe/validation_balanced_clean.csv \
-  --feature-dir data/processed/features_bm25_summary_high_validation \
-  --mode transform \
-  --reference-feature-dir data/processed/features_bm25_summary_high_train \
-  --history-input data/processed/experiment_splits_with_dupe/train_balanced_clean.csv \
-  --text-feature-mode enhanced \
-  --related-mode rep_minus \
-  --rep-weights-json models/rep_minus_weights_bm25_summary_high.json
-```
-
-Natural holdout:
-
-```bash
-python3 scripts/build_features.py \
-  --input data/processed/experiment_splits_with_dupe/natural_test_clean.csv \
-  --feature-dir data/processed/features_bm25_summary_high_natural_test \
-  --mode transform \
-  --reference-feature-dir data/processed/features_bm25_summary_high_train \
-  --history-input data/processed/experiment_splits_with_dupe/train_balanced_clean.csv \
-  --text-feature-mode enhanced \
-  --related-mode rep_minus \
-  --rep-weights-json models/rep_minus_weights_bm25_summary_high.json
-```
-
-### 6. Train and evaluate best boundary model
-
-Use existing best feature directories:
+若特徵資料已存在，可直接重跑目前最佳設定：
 
 ```bash
 python3 scripts/grid_search_bm25_boundary.py \
-  --config-names summary_high \
-  --skip-feature-build
+  --config-names p2_error_keywords \
+  --skip-feature-build \
+  --model-types sgd_log \
+  --alpha-values 0.001,0.01,0.1 \
+  --boundary-apply-values base_1_2,base_1_2_3 \
+  --p2-weight-values 0.10,0.16 \
+  --collapse-floor-values 0.55 \
+  --boundary-p2-sample-weights 1.0,1.2 \
+  --p1-weight 0.02 \
+  --p3-weight 0.01 \
+  --off-by-one-weight 0.02 \
+  --accuracy-drop-weight 0.25 \
+  --collapse-penalty-weight 0.35 \
+  --max-accuracy-drop 0.015 \
+  --output-csv reports/improved_priority_p2_keywords_grid_search.csv \
+  --summary-md reports/improved_priority_p2_keywords_grid_search.md \
+  --best-model-path models/improved_priority_p2_keywords_model.joblib \
+  --best-eval-csv reports/improved_priority_p2_keywords_eval.csv \
+  --best-class-report-csv reports/improved_priority_p2_keywords_class_report.csv
 ```
 
-This writes:
+若要從 REP- 權重與 feature matrix 全部重建，移除 `--skip-feature-build` 即可。
 
-- `models/bm25_boundary_best_model.joblib`
-- `reports/bm25_boundary_best_eval.csv`
-- `reports/bm25_boundary_best_class_report.csv`
-- `reports/bm25_boundary_grid_search.csv`
-- `reports/bm25_boundary_grid_search.md`
+## P2 錯誤分析
 
-### 7. Generate P2 error analysis
+改良後，真實 P2 被判成 P1 或 P3 的錯誤由 50 筆降為 45 筆。
 
 ```bash
-python3 scripts/analyze_priority_errors.py \
-  --model models/bm25_boundary_best_model.joblib \
-  --feature-dir data/processed/features_bm25_summary_high_natural_test \
-  --train-feature-dir data/processed/features_bm25_summary_high_train \
-  --true-priorities 2 \
-  --predicted-priorities 1,3 \
-  --output reports/p2_error_analysis_bm25_boundary_best_natural.csv \
-  --summary-output reports/p2_error_analysis_bm25_boundary_best_summary.md
+cat reports/p2_error_analysis_improved_priority_p2_keywords_summary.md
+cat reports/p2_error_manual_categories_improved_priority_p2_keywords.md
 ```
 
-```bash
-python3 scripts/categorize_p2_boundary_errors.py \
-  --error-csv reports/p2_error_analysis_bm25_boundary_best_natural.csv \
-  --feature-meta data/processed/features_bm25_summary_high_natural_test/feature_meta.csv \
-  --output-csv reports/p2_error_manual_categories_bm25_boundary_best.csv \
-  --summary-md reports/p2_error_manual_categories_bm25_boundary_best.md \
-  --model-name bm25_boundary_best
-```
+目前主要剩餘錯誤類型：
 
-## Project Flow
+- P2 被判成 P1：stack trace / exception 訊號讓模型判太嚴重。
+- P2 被判成 P3：severity 是 normal / enhancement / minor 時容易被判太輕。
+- P2 被判成 P1：UI / debug / core 模組歷史訊號偏高。
 
-1. Fetch Eclipse Bugzilla data with priority labels and `dupe_of`.
-2. Clean summary, first-comment description, category fields, and creation time.
-3. Split data into balanced training, balanced validation, and natural holdout.
-4. Build DRONE-style six-factor features: textual, temporal, author, related-report, severity, and product/component.
-5. Train REP- weights from duplicate links to improve related-report similarity.
-6. Tune BM25/BM25F field weights and train a boundary-refined classifier.
-7. Evaluate on natural holdout and report accuracy, macro F1, off-by-one accuracy, MAE, and P1-P5 recall.
+## 主要文件
 
-## Main Report Files
+- `reports/cleaning_rules.md`：資料清洗與前處理規則。
+- `reports/literature_implementation.md`：本專題如何依據與延伸 DRONE/GRAY 文獻。
+- `reports/model_result_terminal_steps.md`：查看模型結果的終端機指令。
+- `reports/improved_priority_experiment_summary.md`：最新改良實驗與結果比較。
+- `reports/p2_error_analysis_improved_priority_p2_keywords_summary.md`：改良後 P2 錯誤摘要。
+- `reports/p2_error_manual_categories_improved_priority_p2_keywords.md`：改良後 P2 錯誤人工分類。
 
-- `reports/cleaning_rules.md`: data-cleaning and preprocessing rules.
-- `reports/literature_implementation.md`: how the implementation follows and extends DRONE/GRAY.
-- `reports/model_result_terminal_steps.md`: terminal commands for viewing results.
-- `reports/improved_priority_experiment_summary.md`: latest improvement result and comparison.
-- `reports/bm25_boundary_grid_search.md`: previous BM25/BM25F tuning result.
-- `reports/p2_error_analysis_bm25_boundary_best_summary.md`: P2 boundary error summary.
-- `reports/p2_error_manual_categories_bm25_boundary_best.md`: manual-style categories for remaining P2 errors.
+## GitHub 版本控制說明
+
+本 repository 不直接追蹤大型資料與模型檔：
+
+- `data/raw/`
+- `data/processed/`
+- `models/*.joblib`
+
+這些檔案可由上述 pipeline 重新產生。GitHub 上保留的是程式碼、報告、實驗結果 CSV、Markdown 說明與 REP- JSON 權重。
