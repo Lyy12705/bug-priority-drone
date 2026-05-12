@@ -83,7 +83,7 @@ REP-(d, q) =
 
 ## 模型設計
 
-目前最佳模型不是純文獻原版 GRAY，而是依據文獻特徵延伸出的 final improved model。
+目前最佳模型不是純文獻原版 GRAY，而是依據文獻特徵延伸出的 recall-balanced final model。
 
 模型流程：
 
@@ -91,31 +91,32 @@ REP-(d, q) =
 2. 使用 duplicate links 訓練 REP- 權重。
 3. 使用 BM25/BM25F 調整 summary、description、unigram、bigram 欄位權重。
 4. 使用 `SGDClassifier(loss="log_loss")` 作為 direct classifier。
-5. 再加入 P1/P2/P3 boundary classifier，專門處理 P2 容易被判成 P1 或 P3 的邊界問題。
-6. 最後依 validation set 選出最佳設定，並在 `natural_holdout` 做最終測試。
+5. 先根據 P2 錯誤分析加入 keyword features。
+6. 再加入 P1/P2 boundary classifier 與 P4 false-high suppression。
+7. 最後依 validation set 的 macro recall、minimum recall、macro F1 等目標選出最佳設定，並在 `natural_holdout` 做最終測試。
 
 ## 目前最佳結果
 
-最佳模型：`improved_priority_p2_keywords_model`
+最佳模型：`recall_balanced_priority_model`
 
 | 指標 | 數值 |
 |---|---:|
-| Accuracy | 0.7246 |
-| Macro F1 | 0.7240 |
-| Off-by-one accuracy | 0.8995 |
-| MAE | 0.4090 |
-| P1 recall | 0.6482 |
+| Accuracy | 0.7317 |
+| Macro F1 | 0.7309 |
+| Off-by-one accuracy | 0.9025 |
+| MAE | 0.4000 |
+| P1 recall | 0.6583 |
 | P2 recall | 0.6818 |
 | P3 recall | 0.8750 |
-| P4 recall | 0.6834 |
+| P4 recall | 0.7085 |
 | P5 recall | 0.7337 |
 
 與前一版最佳模型相比：
 
-| 模型 | Accuracy | Macro F1 | P2 recall | MAE |
-|---|---:|---:|---:|---:|
-| 舊最佳 BM25 boundary | 0.7116 | 0.7108 | 0.6515 | 0.4302 |
-| 新最佳 p2 keywords SGD | 0.7246 | 0.7240 | 0.6818 | 0.4090 |
+| 模型 | Accuracy | Macro F1 | P1 recall | P2 recall | P4 recall | MAE |
+|---|---:|---:|---:|---:|---:|---:|
+| p2 keywords SGD | 0.7246 | 0.7240 | 0.6482 | 0.6818 | 0.6834 | 0.4090 |
+| Recall-balanced | 0.7317 | 0.7309 | 0.6583 | 0.6818 | 0.7085 | 0.4000 |
 
 ## 與文獻的差異
 
@@ -124,8 +125,8 @@ REP-(d, q) =
 | 資料來源 | Eclipse bug report historical dataset | Eclipse Bugzilla REST / XML 重新抓取 |
 | Description | 原始 report 描述 | 第一則 comment，避免使用後續討論 |
 | Related-report | REP / REP- | duplicate-trained REP- + BM25Fext 欄位權重 |
-| Classification engine | GRAY ordinal regression + thresholds | DRONE/REP- features + direct classifier + boundary refiner |
-| P2 改善 | 文獻未特別針對 P2 邊界做 error-driven 改良 | 根據 P2 錯誤分析加入 keyword features 與 boundary objective |
+| Classification engine | GRAY ordinal regression + thresholds | DRONE/REP- features + direct classifier + recall-balanced local refiners |
+| P2 / per-class 改善 | 文獻未特別針對 P2 邊界做 error-driven 改良 | 根據錯誤分析加入 keyword features、P1/P2 boundary 與 P4 false-high suppression |
 | 評估方式 | 文獻資料與切分設定 | balanced train / validation + natural_holdout |
 
 ## 限制
@@ -140,34 +141,15 @@ REP-(d, q) =
 查看目前最佳結果：
 
 ```bash
-cat reports/improved_priority_p2_keywords_eval.csv
-cat reports/improved_priority_p2_keywords_class_report.csv
-cat reports/improved_priority_experiment_summary.md
+cat reports/recall_balanced_best_eval.csv
+cat reports/recall_balanced_best_class_report.csv
+cat reports/recall_balanced_improvement_summary.md
 ```
 
 重新訓練目前最佳模型：
 
 ```bash
-python3 scripts/grid_search_bm25_boundary.py \
-  --config-names p2_error_keywords \
-  --skip-feature-build \
-  --model-types sgd_log \
-  --alpha-values 0.001,0.01,0.1 \
-  --boundary-apply-values base_1_2,base_1_2_3 \
-  --p2-weight-values 0.10,0.16 \
-  --collapse-floor-values 0.55 \
-  --boundary-p2-sample-weights 1.0,1.2 \
-  --p1-weight 0.02 \
-  --p3-weight 0.01 \
-  --off-by-one-weight 0.02 \
-  --accuracy-drop-weight 0.25 \
-  --collapse-penalty-weight 0.35 \
-  --max-accuracy-drop 0.015 \
-  --output-csv reports/improved_priority_p2_keywords_grid_search.csv \
-  --summary-md reports/improved_priority_p2_keywords_grid_search.md \
-  --best-model-path models/improved_priority_p2_keywords_model.joblib \
-  --best-eval-csv reports/improved_priority_p2_keywords_eval.csv \
-  --best-class-report-csv reports/improved_priority_p2_keywords_class_report.csv
+python3 scripts/train_recall_balanced_priority_model.py
 ```
 
 ## 參考文獻

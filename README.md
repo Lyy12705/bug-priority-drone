@@ -1,6 +1,6 @@
 # Eclipse Bug Priority DRONE/GRAY 優先級判定專題
 
-本專案實作 Eclipse Bugzilla bug report 的 priority prediction。研究方法以 DRONE/GRAY 文獻為基礎，建立 textual、temporal、author、related-report、severity、product/component 六類特徵，並進一步加入 duplicate-trained REP-、BM25/BM25F 欄位權重調整、P1/P2/P3 boundary classifier，以及 P2 錯誤分析導向的 keyword features。
+本專案實作 Eclipse Bugzilla bug report 的 priority prediction。研究方法以 DRONE/GRAY 文獻為基礎，建立 textual、temporal、author、related-report、severity、product/component 六類特徵，並進一步加入 duplicate-trained REP-、BM25/BM25F 欄位權重調整、P2 錯誤分析導向的 keyword features、P1/P2 boundary classifier，以及 P4 false-high suppression。
 
 目前 GitHub 版本保留可重現實驗所需的程式、報告與輕量權重檔。大型資料集、feature matrix 與 `.joblib` 模型檔已透過 `.gitignore` 排除，避免 repository 過大；需要時可依照本文件指令重新產生。
 
@@ -8,14 +8,14 @@
 
 | 項目 | 路徑 |
 |---|---|
-| 最佳模型 | `models/improved_priority_p2_keywords_model.joblib` |
+| 最佳模型 | `models/recall_balanced_priority_model.joblib` |
 | REP- 權重 | `models/rep_minus_weights_bm25_p2_error_keywords.json` |
 | 訓練特徵 | `data/processed/features_bm25_p2_error_keywords_train` |
 | 驗證特徵 | `data/processed/features_bm25_p2_error_keywords_validation` |
 | 最終測試特徵 | `data/processed/features_bm25_p2_error_keywords_natural_test` |
-| 主要評估結果 | `reports/improved_priority_p2_keywords_eval.csv` |
-| 各類別分類報告 | `reports/improved_priority_p2_keywords_class_report.csv` |
-| 改良實驗摘要 | `reports/improved_priority_experiment_summary.md` |
+| 主要評估結果 | `reports/recall_balanced_best_eval.csv` |
+| 各類別分類報告 | `reports/recall_balanced_best_class_report.csv` |
+| 改良實驗摘要 | `reports/recall_balanced_improvement_summary.md` |
 
 ## 目前最佳結果
 
@@ -23,22 +23,22 @@
 
 | 指標 | 數值 |
 |---|---:|
-| Accuracy | 0.7246 |
-| Macro F1 | 0.7240 |
-| Off-by-one accuracy | 0.8995 |
-| MAE | 0.4090 |
-| P1 recall | 0.6482 |
+| Accuracy | 0.7317 |
+| Macro F1 | 0.7309 |
+| Off-by-one accuracy | 0.9025 |
+| MAE | 0.4000 |
+| P1 recall | 0.6583 |
 | P2 recall | 0.6818 |
 | P3 recall | 0.8750 |
-| P4 recall | 0.6834 |
+| P4 recall | 0.7085 |
 | P5 recall | 0.7337 |
 
 和前一版最佳模型相比：
 
-| 模型 | Accuracy | Macro F1 | P2 recall | MAE |
-|---|---:|---:|---:|---:|
-| 舊最佳 BM25 boundary | 0.7116 | 0.7108 | 0.6515 | 0.4302 |
-| 新最佳 p2 keywords SGD | 0.7246 | 0.7240 | 0.6818 | 0.4090 |
+| 模型 | Accuracy | Macro F1 | P1 recall | P2 recall | P4 recall | MAE |
+|---|---:|---:|---:|---:|---:|---:|
+| p2 keywords SGD | 0.7246 | 0.7240 | 0.6482 | 0.6818 | 0.6834 | 0.4090 |
+| Recall-balanced | 0.7317 | 0.7309 | 0.6583 | 0.6818 | 0.7085 | 0.4000 |
 
 ## 專案流程
 
@@ -50,7 +50,8 @@
 6. 調整 BM25/BM25F summary、description、unigram、bigram 欄位權重。
 7. 使用 P1/P2/P3 boundary classifier 改善 P2 容易被判成 P1 或 P3 的問題。
 8. 針對 P2 剩餘錯誤加入 keyword features，重新比較模型表現。
-9. 在 `natural_holdout` 上報告 accuracy、macro F1、off-by-one accuracy、MAE 與 P1-P5 recall。
+9. 加入 recall-balanced objective、P1/P2 boundary classifier 與 P4 false-high suppression。
+10. 在 `natural_holdout` 上報告 accuracy、macro F1、off-by-one accuracy、MAE 與 P1-P5 recall。
 
 ## 查看目前結果
 
@@ -63,9 +64,9 @@ python3 scripts/show_model_metrics.py
 若要查看原始 CSV 與完整分類報告：
 
 ```bash
-cat reports/improved_priority_p2_keywords_eval.csv
-cat reports/improved_priority_p2_keywords_class_report.csv
-cat reports/improved_priority_experiment_summary.md
+cat reports/recall_balanced_best_eval.csv
+cat reports/recall_balanced_best_class_report.csv
+cat reports/recall_balanced_improvement_summary.md
 ```
 
 用較好讀的表格查看重點指標：
@@ -74,7 +75,7 @@ cat reports/improved_priority_experiment_summary.md
 python3 - <<'PY'
 import pandas as pd
 
-df = pd.read_csv("reports/improved_priority_p2_keywords_eval.csv")
+df = pd.read_csv("reports/recall_balanced_best_eval.csv")
 cols = [
     "accuracy",
     "macro_f1",
@@ -122,38 +123,19 @@ python3 scripts/build_experiment_splits.py \
   --balanced-test-per-class 250
 ```
 
-### 4. 重新訓練目前最佳改良模型
+### 4. 重新訓練目前最佳 Recall-balanced 模型
 
 若特徵資料已存在，可直接重跑目前最佳設定：
 
 ```bash
-python3 scripts/grid_search_bm25_boundary.py \
-  --config-names p2_error_keywords \
-  --skip-feature-build \
-  --model-types sgd_log \
-  --alpha-values 0.001,0.01,0.1 \
-  --boundary-apply-values base_1_2,base_1_2_3 \
-  --p2-weight-values 0.10,0.16 \
-  --collapse-floor-values 0.55 \
-  --boundary-p2-sample-weights 1.0,1.2 \
-  --p1-weight 0.02 \
-  --p3-weight 0.01 \
-  --off-by-one-weight 0.02 \
-  --accuracy-drop-weight 0.25 \
-  --collapse-penalty-weight 0.35 \
-  --max-accuracy-drop 0.015 \
-  --output-csv reports/improved_priority_p2_keywords_grid_search.csv \
-  --summary-md reports/improved_priority_p2_keywords_grid_search.md \
-  --best-model-path models/improved_priority_p2_keywords_model.joblib \
-  --best-eval-csv reports/improved_priority_p2_keywords_eval.csv \
-  --best-class-report-csv reports/improved_priority_p2_keywords_class_report.csv
+python3 scripts/train_recall_balanced_priority_model.py
 ```
 
-若要從 REP- 權重與 feature matrix 全部重建，移除 `--skip-feature-build` 即可。
+此指令預設讀取 `data/processed/features_bm25_p2_error_keywords_*`，並輸出 `models/recall_balanced_priority_model.joblib` 與 `reports/recall_balanced_best_eval.csv`。
 
 ## P2 錯誤分析
 
-改良後，真實 P2 被判成 P1 或 P3 的錯誤由 50 筆降為 45 筆。
+前一版改良後，真實 P2 被判成 P1 或 P3 的錯誤由 50 筆降為 45 筆；目前最佳 Recall-balanced 模型則進一步改善整體 per-class recall，尤其 P4 recall 從 0.6834 提升到 0.7085。
 
 ```bash
 cat reports/p2_error_analysis_improved_priority_p2_keywords_summary.md
@@ -171,7 +153,9 @@ cat reports/p2_error_manual_categories_improved_priority_p2_keywords.md
 - `reports/cleaning_rules.md`：資料清洗與前處理規則。
 - `reports/literature_implementation.md`：本專題如何依據與延伸 DRONE/GRAY 文獻。
 - `reports/model_result_terminal_steps.md`：查看模型結果的終端機指令。
-- `reports/improved_priority_experiment_summary.md`：最新改良實驗與結果比較。
+- `reports/recall_balanced_improvement_summary.md`：目前最佳 Recall-balanced 實驗與結果比較。
+- `reports/recall_balanced_priority_model.md`：目前最佳模型訓練摘要。
+- `reports/per_class_error_analysis_recall_balanced.md`：目前最佳模型各類別錯誤分析。
 - `reports/p2_error_analysis_improved_priority_p2_keywords_summary.md`：改良後 P2 錯誤摘要。
 - `reports/p2_error_manual_categories_improved_priority_p2_keywords.md`：改良後 P2 錯誤人工分類。
 

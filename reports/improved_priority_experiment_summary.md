@@ -1,6 +1,8 @@
 # 優先級判定改良實驗摘要
 
-本文件記錄目前最佳模型的改良過程與結果。這次改良依照以下順序進行：
+> 注意：本文件記錄的是前一階段 `p2_keywords_sgd` 改良模型。此模型後續已被 `recall_balanced_priority_model` 取代；目前最佳結果請以 `reports/recall_balanced_best_eval.csv`、`reports/recall_balanced_improvement_summary.md` 為準。
+
+本文件記錄前一階段改良模型的過程與結果。這次改良依照以下順序進行：
 
 1. 針對 P2 錯誤案例加入更多 keyword features。
 2. 強化 P1/P2/P3 boundary classifier objective。
@@ -91,9 +93,9 @@ LightGBM 目前未安裝，因此本次使用 XGBoost 作為 improved classifier
 | `bigram_high_sgd` | 0.7196 | 0.7195 | 0.9015 | 0.4111 | 0.6482 | **0.6869** | 0.8350 | 0.6784 | **0.7487** |
 | `p2_keywords_xgboost` | 0.7095 | 0.7094 | **0.9116** | 0.4111 | **0.6985** | 0.5606 | 0.8050 | 0.7538 | 0.7286 |
 
-## 目前最佳改良模型
+## 前一階段最佳改良模型
 
-目前建議採用 `p2_keywords_sgd` 作為新的最佳模型。
+當時建議採用 `p2_keywords_sgd` 作為新的最佳模型；後續已由 Recall-balanced 模型取代。
 
 | 項目 | 路徑 |
 |---|---|
@@ -146,7 +148,7 @@ Transformer 實驗需要額外安裝套件並下載模型，例如 `sentence-tra
 
 - 會增加大量 dependency 與模型下載成本。
 - 訓練與推論時間會明顯增加。
-- 目前 error-driven DRONE/REP-/BM25F 改良已經把 accuracy 提升到 `0.7246`。
+- 此階段 error-driven DRONE/REP-/BM25F 改良已經把 accuracy 提升到 `0.7246`。
 
 可放在未來改善：
 
@@ -161,7 +163,7 @@ cat reports/improved_priority_comparison.csv
 cat reports/improved_priority_experiment_summary.md
 ```
 
-查看新的最佳改良模型：
+查看此階段改良模型：
 
 ```bash
 cat reports/improved_priority_p2_keywords_eval.csv

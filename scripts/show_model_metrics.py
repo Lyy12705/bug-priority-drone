@@ -5,7 +5,7 @@ import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_INPUT = PROJECT_ROOT / "reports" / "improved_priority_p2_keywords_eval.csv"
+DEFAULT_INPUT = PROJECT_ROOT / "reports" / "recall_balanced_best_eval.csv"
 
 METRICS = [
     ("Accuracy", "accuracy"),
