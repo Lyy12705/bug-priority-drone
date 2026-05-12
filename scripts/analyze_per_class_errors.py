@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def label_name(label: int) -> str:
-    return PRIORITY_NAMES[int(label)]
+    return PRIORITY_NAMES[label]
 
 
 def markdown_table(df: pd.DataFrame, limit: int | None = None) -> str:
@@ -203,12 +203,12 @@ def write_report(
     overall = pd.DataFrame(
         [
             {
-                "rows": int(len(y)),
+                "rows": len(y),
                 "removed_training_overlap": removed_overlap,
                 "accuracy": accuracy_score(y, y_pred),
                 "macro_f1": f1_score(y, y_pred, labels=LABELS, average="macro", zero_division=0),
-                "off_by_one_accuracy": float(np.mean(np.abs(y - y_pred) <= 1)),
-                "mae": float(np.mean(np.abs(y - y_pred))),
+                "off_by_one_accuracy": np.mean(np.abs(y - y_pred) <= 1),
+                "mae": np.mean(np.abs(y - y_pred)),
             }
         ]
     )

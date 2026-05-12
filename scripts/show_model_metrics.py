@@ -48,8 +48,7 @@ def main() -> None:
     if df.empty:
         raise ValueError(f"No rows found in {input_path}")
 
-    missing = [column for _, column in METRICS if column not in df.columns]
-    if missing:
+    if missing := [column for _, column in METRICS if column not in df.columns]:
         raise ValueError(f"Missing required metric columns in {input_path}: {missing}")
 
     row = df.iloc[0]

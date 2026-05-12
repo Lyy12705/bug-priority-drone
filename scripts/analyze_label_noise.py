@@ -55,16 +55,15 @@ def priority_counts(group: pd.DataFrame) -> dict:
     probs = counts[counts > 0] / total if total else counts
     entropy = float(-(probs * np.log2(probs)).sum()) if total else 0.0
     normalized_entropy = entropy / math.log2(len(PRIORITIES)) if total else 0.0
-    row = {
+    return {
         "rows": total,
         "dominant_priority": dominant_priority,
         "dominant_share": dominant_share,
         "entropy": entropy,
         "normalized_entropy": normalized_entropy,
         "unique_priorities": int((counts > 0).sum()),
+        **{priority: int(counts[priority]) for priority in PRIORITIES},
     }
-    row.update({priority: int(counts[priority]) for priority in PRIORITIES})
-    return row
 
 
 def summarize_groups(df: pd.DataFrame, group_cols: list[str], min_group_size: int, dominant_share_threshold: float) -> pd.DataFrame:
@@ -77,9 +76,7 @@ def summarize_groups(df: pd.DataFrame, group_cols: list[str], min_group_size: in
             continue
         if stats["dominant_share"] > dominant_share_threshold:
             continue
-        row = {column: value for column, value in zip(group_cols, keys)}
-        row["grouping"] = "+".join(group_cols)
-        row.update(stats)
+        row = dict(zip(group_cols, keys)) | {"grouping": "+".join(group_cols)} | stats
         rows.append(row)
     if not rows:
         return pd.DataFrame()
@@ -102,8 +99,7 @@ def duplicate_disagreements(df: pd.DataFrame) -> pd.DataFrame:
             "bug_ids": ",".join(group["id"].astype(str).head(12)),
             "products": ",".join(sorted(group["product"].fillna("unknown").astype(str).unique())[:8]),
             "components": ",".join(sorted(group["component"].fillna("unknown").astype(str).unique())[:8]),
-        }
-        row.update(stats)
+        } | stats
         rows.append(row)
     if not rows:
         return pd.DataFrame()
