@@ -20,7 +20,7 @@ def project_path(relative_path: str) -> str:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Train recall-balanced model with P1/P2 boundary and P4 false-high suppression.",
+        description="Train recall-balanced model with cost-sensitive class weights and P1/P2 boundary refinement.",
     )
     parser.add_argument("--train-feature-dir", default=project_path("data/processed/features_bm25_p2_error_keywords_train"))
     parser.add_argument("--validation-feature-dir", default=project_path("data/processed/features_bm25_p2_error_keywords_validation"))
@@ -33,8 +33,21 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--model-types", default="sgd_log")
     parser.add_argument("--alpha-values", default="0.03,0.05,0.1")
     parser.add_argument("--c-values", default="0.1,0.3,1.0")
-    parser.add_argument("--p1-sample-weights", default="1.0,1.2,1.4")
-    parser.add_argument("--p4-sample-weights", default="1.0,1.3,1.6")
+    parser.add_argument("--base-p1-sample-weights", default="1.0")
+    parser.add_argument("--base-p2-sample-weights", default="1.0,1.15")
+    parser.add_argument(
+        "--base-p4-sample-weights",
+        "--p4-sample-weights",
+        dest="base_p4_sample_weights",
+        default="1.0,1.2,1.4",
+    )
+    parser.add_argument(
+        "--boundary-p1-sample-weights",
+        "--p1-sample-weights",
+        dest="boundary_p1_sample_weights",
+        default="1.0,1.2,1.4",
+    )
+    parser.add_argument("--boundary-p2-sample-weights", default="1.0")
     parser.add_argument("--macro-recall-weight", type=float, default=1.00)
     parser.add_argument("--min-recall-weight", type=float, default=0.60)
     parser.add_argument("--macro-f1-weight", type=float, default=0.60)
@@ -104,13 +117,6 @@ def predict_recall_balanced(bundle: dict, X) -> np.ndarray:
         if p1p2_mask.any():
             y_pred[p1p2_mask] = p1p2_model.predict(X[p1p2_mask]).astype(int)
 
-    p2p4_model = bundle.get("p2p4_model")
-    if p2p4_model is not None:
-        p2_mask = y_pred == 2
-        if p2_mask.any():
-            p2p4_pred = p2p4_model.predict(X[p2_mask]).astype(int)
-            y_pred[p2_mask] = np.where(p2p4_pred == 4, 4, y_pred[p2_mask])
-
     return y_pred
 
 
@@ -161,12 +167,13 @@ def write_summary(path: str, candidates: pd.DataFrame, eval_df: pd.DataFrame, ma
         "stage",
         "base_model_type",
         "base_params",
+        "base_p1_sample_weight",
+        "base_p2_sample_weight",
+        "base_p4_sample_weight",
         "p1p2_model_type",
         "p1p2_params",
-        "p1_sample_weight",
-        "p2p4_model_type",
-        "p2p4_params",
-        "p4_sample_weight",
+        "boundary_p1_sample_weight",
+        "boundary_p2_sample_weight",
         "validation_objective",
         "validation_macro_recall",
         "validation_min_recall",
@@ -180,10 +187,10 @@ def write_summary(path: str, candidates: pd.DataFrame, eval_df: pd.DataFrame, ma
     lines = [
         "# Recall-Balanced Priority Model",
         "",
-        "This experiment adds two local correction layers on top of the base DRONE/REP- classifier:",
+        "This experiment keeps the DRONE/REP- feature design and uses a more formal recall-balanced training strategy:",
         "",
-        "1. P1/P2 boundary classifier to recover P1 recall.",
-        "2. P4 false-high suppression to reduce P4 cases incorrectly predicted as P2.",
+        "1. Cost-sensitive class sample weights for the base classifier.",
+        "2. P1/P2 boundary classifier for high-priority boundary refinement.",
         "",
         "Selection uses validation-set `macro recall + minimum recall + macro F1`, with MAE and low-recall penalties.",
         "",
@@ -225,91 +232,84 @@ def main() -> None:
     best_score = -np.inf
 
     base_fits = []
-    for base_model_type, base_params, base_model in build_candidates(args):
-        fit_candidate(base_model, X_train, y_train)
-        base_bundle = {"base_model": base_model, "p1p2_model": None, "p2p4_model": None}
-        y_val_pred = predict_recall_balanced(base_bundle, X_val)
-        y_nat_pred = predict_recall_balanced(base_bundle, X_nat)
-        val_row = metric_row(y_val, y_val_pred, "validation")
-        nat_row = metric_row(y_nat, y_nat_pred, "natural_holdout")
-        objective = selection_objective(val_row, args)
-        settings = {
-            "base_model_type": base_model_type,
-            "base_params": base_params,
-            "p1p2_model_type": "",
-            "p1p2_params": "",
-            "p1_sample_weight": 1.0,
-            "p2p4_model_type": "",
-            "p2p4_params": "",
-            "p4_sample_weight": 1.0,
-        }
-        rows.append(candidate_row("base_direct", settings, val_row, nat_row, objective))
-        base_fits.append((base_model_type, base_params, base_model))
-        if objective > best_score:
-            best_score = objective
-            best = {"bundle": base_bundle, "settings": settings, "stage": "base_direct", "nat_pred": y_nat_pred, "nat_row": nat_row}
+    base_p1_weights = parse_float_list(args.base_p1_sample_weights)
+    base_p2_weights = parse_float_list(args.base_p2_sample_weights)
+    base_p4_weights = parse_float_list(args.base_p4_sample_weights)
+    for base_p1_weight in base_p1_weights:
+        for base_p2_weight in base_p2_weights:
+            for base_p4_weight in base_p4_weights:
+                base_sample_weight = np.ones(len(y_train), dtype=float)
+                base_sample_weight[y_train == 1] = base_p1_weight
+                base_sample_weight[y_train == 2] = base_p2_weight
+                base_sample_weight[y_train == 4] = base_p4_weight
+                for base_model_type, base_params, base_model in build_candidates(args):
+                    fit_candidate(base_model, X_train, y_train, sample_weight=base_sample_weight)
+                    base_bundle = {"base_model": base_model, "p1p2_model": None}
+                    y_val_pred = predict_recall_balanced(base_bundle, X_val)
+                    y_nat_pred = predict_recall_balanced(base_bundle, X_nat)
+                    val_row = metric_row(y_val, y_val_pred, "validation")
+                    nat_row = metric_row(y_nat, y_nat_pred, "natural_holdout")
+                    objective = selection_objective(val_row, args)
+                    settings = {
+                        "base_model_type": base_model_type,
+                        "base_params": base_params,
+                        "base_p1_sample_weight": base_p1_weight,
+                        "base_p2_sample_weight": base_p2_weight,
+                        "base_p4_sample_weight": base_p4_weight,
+                        "p1p2_model_type": "",
+                        "p1p2_params": "",
+                        "boundary_p1_sample_weight": 1.0,
+                        "boundary_p2_sample_weight": 1.0,
+                    }
+                    rows.append(candidate_row("cost_sensitive_base", settings, val_row, nat_row, objective))
+                    base_fits.append((base_model_type, base_params, base_model, settings))
+                    if objective > best_score:
+                        best_score = objective
+                        best = {
+                            "bundle": base_bundle,
+                            "settings": settings,
+                            "stage": "cost_sensitive_base",
+                            "nat_pred": y_nat_pred,
+                            "nat_row": nat_row,
+                        }
 
     p1p2_mask = np.isin(y_train, [1, 2])
     X_p1p2 = X_train[p1p2_mask]
     y_p1p2 = y_train[p1p2_mask]
-    p2p4_mask = np.isin(y_train, [2, 4])
-    X_p2p4 = X_train[p2p4_mask]
-    y_p2p4 = y_train[p2p4_mask]
 
-    p1_weights = parse_float_list(args.p1_sample_weights)
-    p4_weights = parse_float_list(args.p4_sample_weights)
-    for base_model_type, base_params, base_model in base_fits:
-        for p1_weight in p1_weights:
-            p1_sample_weight = np.ones(len(y_p1p2), dtype=float)
-            p1_sample_weight[y_p1p2 == 1] = p1_weight
-            for p1p2_model_type, p1p2_params, p1p2_model in build_candidates(args):
-                fit_candidate(p1p2_model, X_p1p2, y_p1p2, sample_weight=p1_sample_weight)
-                p1p2_bundle = {"base_model": base_model, "p1p2_model": p1p2_model, "p2p4_model": None}
-                y_val_pred = predict_recall_balanced(p1p2_bundle, X_val)
-                y_nat_pred = predict_recall_balanced(p1p2_bundle, X_nat)
-                val_row = metric_row(y_val, y_val_pred, "validation")
-                nat_row = metric_row(y_nat, y_nat_pred, "natural_holdout")
-                objective = selection_objective(val_row, args)
-                settings = {
-                    "base_model_type": base_model_type,
-                    "base_params": base_params,
-                    "p1p2_model_type": p1p2_model_type,
-                    "p1p2_params": p1p2_params,
-                    "p1_sample_weight": p1_weight,
-                    "p2p4_model_type": "",
-                    "p2p4_params": "",
-                    "p4_sample_weight": 1.0,
-                }
-                rows.append(candidate_row("p1p2_boundary", settings, val_row, nat_row, objective))
-                if objective > best_score:
-                    best_score = objective
-                    best = {"bundle": p1p2_bundle, "settings": settings, "stage": "p1p2_boundary", "nat_pred": y_nat_pred, "nat_row": nat_row}
-
-                for p4_weight in p4_weights:
-                    p4_sample_weight = np.ones(len(y_p2p4), dtype=float)
-                    p4_sample_weight[y_p2p4 == 4] = p4_weight
-                    for p2p4_model_type, p2p4_params, p2p4_model in build_candidates(args):
-                        fit_candidate(p2p4_model, X_p2p4, y_p2p4, sample_weight=p4_sample_weight)
-                        full_bundle = {"base_model": base_model, "p1p2_model": p1p2_model, "p2p4_model": p2p4_model}
-                        y_val_pred = predict_recall_balanced(full_bundle, X_val)
-                        y_nat_pred = predict_recall_balanced(full_bundle, X_nat)
-                        val_row = metric_row(y_val, y_val_pred, "validation")
-                        nat_row = metric_row(y_nat, y_nat_pred, "natural_holdout")
-                        objective = selection_objective(val_row, args)
-                        settings = {
-                            "base_model_type": base_model_type,
-                            "base_params": base_params,
-                            "p1p2_model_type": p1p2_model_type,
-                            "p1p2_params": p1p2_params,
-                            "p1_sample_weight": p1_weight,
-                            "p2p4_model_type": p2p4_model_type,
-                            "p2p4_params": p2p4_params,
-                            "p4_sample_weight": p4_weight,
+    boundary_p1_weights = parse_float_list(args.boundary_p1_sample_weights)
+    boundary_p2_weights = parse_float_list(args.boundary_p2_sample_weights)
+    for base_model_type, base_params, base_model, base_settings in base_fits:
+        for boundary_p1_weight in boundary_p1_weights:
+            for boundary_p2_weight in boundary_p2_weights:
+                boundary_sample_weight = np.ones(len(y_p1p2), dtype=float)
+                boundary_sample_weight[y_p1p2 == 1] = boundary_p1_weight
+                boundary_sample_weight[y_p1p2 == 2] = boundary_p2_weight
+                for p1p2_model_type, p1p2_params, p1p2_model in build_candidates(args):
+                    fit_candidate(p1p2_model, X_p1p2, y_p1p2, sample_weight=boundary_sample_weight)
+                    p1p2_bundle = {"base_model": base_model, "p1p2_model": p1p2_model}
+                    y_val_pred = predict_recall_balanced(p1p2_bundle, X_val)
+                    y_nat_pred = predict_recall_balanced(p1p2_bundle, X_nat)
+                    val_row = metric_row(y_val, y_val_pred, "validation")
+                    nat_row = metric_row(y_nat, y_nat_pred, "natural_holdout")
+                    objective = selection_objective(val_row, args)
+                    settings = {
+                        **base_settings,
+                        "p1p2_model_type": p1p2_model_type,
+                        "p1p2_params": p1p2_params,
+                        "boundary_p1_sample_weight": boundary_p1_weight,
+                        "boundary_p2_sample_weight": boundary_p2_weight,
+                    }
+                    rows.append(candidate_row("cost_sensitive_p1p2_boundary", settings, val_row, nat_row, objective))
+                    if objective > best_score:
+                        best_score = objective
+                        best = {
+                            "bundle": p1p2_bundle,
+                            "settings": settings,
+                            "stage": "cost_sensitive_p1p2_boundary",
+                            "nat_pred": y_nat_pred,
+                            "nat_row": nat_row,
                         }
-                        rows.append(candidate_row("p1p2_p4_suppression", settings, val_row, nat_row, objective))
-                        if objective > best_score:
-                            best_score = objective
-                            best = {"bundle": full_bundle, "settings": settings, "stage": "p1p2_p4_suppression", "nat_pred": y_nat_pred, "nat_row": nat_row}
 
     if best is None:
         raise RuntimeError("No candidate selected.")
@@ -319,13 +319,12 @@ def main() -> None:
     candidates.to_csv(args.candidate_csv, index=False, encoding="utf-8-sig")
 
     model_bundle = {
-        "model_type": "recall_balanced_boundary_suppression",
+        "model_type": "recall_balanced_cost_sensitive",
         "feature_profile": "bm25_p2_error_keywords",
         "stage": best["stage"],
         "labels": LABELS,
         "base_model": best["bundle"]["base_model"],
         "p1p2_model": best["bundle"].get("p1p2_model"),
-        "p2p4_model": best["bundle"].get("p2p4_model"),
         "settings": best["settings"],
         "selection_objective": {
             "macro_recall_weight": args.macro_recall_weight,
@@ -365,10 +364,12 @@ def main() -> None:
         "stage",
         "base_model_type",
         "base_params",
+        "base_p1_sample_weight",
+        "base_p2_sample_weight",
+        "base_p4_sample_weight",
         "p1p2_params",
-        "p1_sample_weight",
-        "p2p4_params",
-        "p4_sample_weight",
+        "boundary_p1_sample_weight",
+        "boundary_p2_sample_weight",
         "validation_objective",
         "validation_macro_recall",
         "validation_min_recall",

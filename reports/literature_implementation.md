@@ -92,7 +92,7 @@ REP-(d, q) =
 3. 使用 BM25/BM25F 調整 summary、description、unigram、bigram 欄位權重。
 4. 使用 `SGDClassifier(loss="log_loss")` 作為 direct classifier。
 5. 先根據 P2 錯誤分析加入 keyword features。
-6. 再加入 P1/P2 boundary classifier 與 P4 false-high suppression。
+6. 再加入 cost-sensitive class sample weights 與 P1/P2 boundary classifier。
 7. 最後依 validation set 的 macro recall、minimum recall、macro F1 等目標選出最佳設定，並在 `natural_holdout` 做最終測試。
 
 ## 目前最佳結果
@@ -101,22 +101,22 @@ REP-(d, q) =
 
 | 指標 | 數值 |
 |---|---:|
-| Accuracy | 0.7317 |
-| Macro F1 | 0.7309 |
-| Off-by-one accuracy | 0.9025 |
-| MAE | 0.4000 |
+| Accuracy | 0.7266 |
+| Macro F1 | 0.7265 |
+| Off-by-one accuracy | 0.9045 |
+| MAE | 0.4040 |
 | P1 recall | 0.6583 |
-| P2 recall | 0.6818 |
-| P3 recall | 0.8750 |
-| P4 recall | 0.7085 |
-| P5 recall | 0.7337 |
+| P2 recall | 0.6869 |
+| P3 recall | 0.8350 |
+| P4 recall | 0.7136 |
+| P5 recall | 0.7387 |
 
 與前一版最佳模型相比：
 
 | 模型 | Accuracy | Macro F1 | P1 recall | P2 recall | P4 recall | MAE |
 |---|---:|---:|---:|---:|---:|---:|
 | p2 keywords SGD | 0.7246 | 0.7240 | 0.6482 | 0.6818 | 0.6834 | 0.4090 |
-| Recall-balanced | 0.7317 | 0.7309 | 0.6583 | 0.6818 | 0.7085 | 0.4000 |
+| Recall-balanced cost-sensitive | 0.7266 | 0.7265 | 0.6583 | 0.6869 | 0.7136 | 0.4040 |
 
 ## 與文獻的差異
 
@@ -126,7 +126,7 @@ REP-(d, q) =
 | Description | 原始 report 描述 | 第一則 comment，避免使用後續討論 |
 | Related-report | REP / REP- | duplicate-trained REP- + BM25Fext 欄位權重 |
 | Classification engine | GRAY ordinal regression + thresholds | DRONE/REP- features + direct classifier + recall-balanced local refiners |
-| P2 / per-class 改善 | 文獻未特別針對 P2 邊界做 error-driven 改良 | 根據錯誤分析加入 keyword features、P1/P2 boundary 與 P4 false-high suppression |
+| P2 / per-class 改善 | 文獻未特別針對 P2 邊界做 error-driven 改良 | 根據錯誤分析加入 keyword features、P1/P2 boundary 與 cost-sensitive recall-balanced objective |
 | 評估方式 | 文獻資料與切分設定 | balanced train / validation + natural_holdout |
 
 ## 限制

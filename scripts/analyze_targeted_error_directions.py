@@ -257,8 +257,8 @@ def write_summary(path: str, selected: pd.DataFrame, meta: pd.DataFrame, directi
     lines.extend([
         "## Interpretation",
         "",
-        "- P1 -> P2 表示高優先級 bug 被模型判太輕，需要 P1/P2 boundary classifier 補回 P1 recall。",
-        "- P4 -> P2 表示低優先級 bug 被模型拉太高，需要 false-high suppression 抑制過度預測 P2。",
+        "- P1 -> P2 表示高優先級 bug 被模型判太輕，可用 P1/P2 boundary refinement 補強高優先級邊界。",
+        "- P4 -> P2 表示低優先級 bug 被模型拉太高，本版改用 cost-sensitive / recall-balanced learning 讓 P4 recall 納入正式選模目標。",
         "",
     ])
     os.makedirs(os.path.dirname(path), exist_ok=True)

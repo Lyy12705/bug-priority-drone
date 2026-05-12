@@ -1,6 +1,6 @@
 # Eclipse Bug Priority DRONE/GRAY 優先級判定專題
 
-本專案實作 Eclipse Bugzilla bug report 的 priority prediction。研究方法以 DRONE/GRAY 文獻為基礎，建立 textual、temporal、author、related-report、severity、product/component 六類特徵，並進一步加入 duplicate-trained REP-、BM25/BM25F 欄位權重調整、P2 錯誤分析導向的 keyword features、P1/P2 boundary classifier，以及 P4 false-high suppression。
+本專案實作 Eclipse Bugzilla bug report 的 priority prediction。研究方法以 DRONE/GRAY 文獻為基礎，建立 textual、temporal、author、related-report、severity、product/component 六類特徵，並進一步加入 duplicate-trained REP-、BM25/BM25F 欄位權重調整、P2 錯誤分析導向的 keyword features、P1/P2 boundary classifier，以及 cost-sensitive recall-balanced learning。
 
 目前 GitHub 版本保留可重現實驗所需的程式、報告與輕量權重檔。大型資料集、feature matrix 與 `.joblib` 模型檔已透過 `.gitignore` 排除，避免 repository 過大；需要時可依照本文件指令重新產生。
 
@@ -23,22 +23,22 @@
 
 | 指標 | 數值 |
 |---|---:|
-| Accuracy | 0.7317 |
-| Macro F1 | 0.7309 |
-| Off-by-one accuracy | 0.9025 |
-| MAE | 0.4000 |
+| Accuracy | 0.7266 |
+| Macro F1 | 0.7265 |
+| Off-by-one accuracy | 0.9045 |
+| MAE | 0.4040 |
 | P1 recall | 0.6583 |
-| P2 recall | 0.6818 |
-| P3 recall | 0.8750 |
-| P4 recall | 0.7085 |
-| P5 recall | 0.7337 |
+| P2 recall | 0.6869 |
+| P3 recall | 0.8350 |
+| P4 recall | 0.7136 |
+| P5 recall | 0.7387 |
 
 和前一版最佳模型相比：
 
 | 模型 | Accuracy | Macro F1 | P1 recall | P2 recall | P4 recall | MAE |
 |---|---:|---:|---:|---:|---:|---:|
 | p2 keywords SGD | 0.7246 | 0.7240 | 0.6482 | 0.6818 | 0.6834 | 0.4090 |
-| Recall-balanced | 0.7317 | 0.7309 | 0.6583 | 0.6818 | 0.7085 | 0.4000 |
+| Recall-balanced cost-sensitive | 0.7266 | 0.7265 | 0.6583 | 0.6869 | 0.7136 | 0.4040 |
 
 ## 專案流程
 
@@ -50,7 +50,7 @@
 6. 調整 BM25/BM25F summary、description、unigram、bigram 欄位權重。
 7. 使用 P1/P2/P3 boundary classifier 改善 P2 容易被判成 P1 或 P3 的問題。
 8. 針對 P2 剩餘錯誤加入 keyword features，重新比較模型表現。
-9. 加入 recall-balanced objective、P1/P2 boundary classifier 與 P4 false-high suppression。
+9. 加入 recall-balanced objective、class-specific sample weights 與 P1/P2 boundary classifier。
 10. 在 `natural_holdout` 上報告 accuracy、macro F1、off-by-one accuracy、MAE 與 P1-P5 recall。
 
 ## 查看目前結果
@@ -135,7 +135,7 @@ python3 scripts/train_recall_balanced_priority_model.py
 
 ## P2 錯誤分析
 
-前一版改良後，真實 P2 被判成 P1 或 P3 的錯誤由 50 筆降為 45 筆；目前最佳 Recall-balanced 模型則進一步改善整體 per-class recall，尤其 P4 recall 從 0.6834 提升到 0.7085。
+前一版改良後，真實 P2 被判成 P1 或 P3 的錯誤由 50 筆降為 45 筆；目前最佳 Recall-balanced cost-sensitive 模型則進一步改善整體 per-class recall，尤其 P2 recall 從 0.6818 提升到 0.6869，P4 recall 從 0.6834 提升到 0.7136。
 
 ```bash
 cat reports/p2_error_analysis_improved_priority_p2_keywords_summary.md

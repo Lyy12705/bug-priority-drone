@@ -1,62 +1,50 @@
-# Recall-Balanced 改善實驗總結
+# Recall-Balanced Cost-Sensitive 改善實驗總結
 
-本次依照以下順序實作：
+本版將原先較像局部修正的 `P2/P4 correction classifier` 從主流程移除，改成較正式的 cost-sensitive / recall-balanced learning。
 
-1. 分析 `P1 -> P2` 與 `P4 -> P2` 錯誤細節
-2. 加入 `P1/P2 boundary classifier`
-3. 加入 `P4 false-high suppression`
-4. 使用 `macro recall + minimum recall` 做 final objective grid search
+## 1. 本次保留與移除
 
-## 1. P1 -> P2 與 P4 -> P2 錯誤分析
+| 項目 | 狀態 | 原因 |
+|---|---|---|
+| DRONE/REP- 六類特徵 | 保留 | 這是文獻基礎與主特徵來源 |
+| P2 error-driven keyword features | 保留 | 補強 crash、exception、regression、data loss 等 domain 訊號 |
+| P1/P2 boundary classifier | 保留 | 屬於高優先級邊界 refinement，目的明確 |
+| P2/P4 correction classifier | 移除 | 太像針對單一錯誤方向的 local heuristic |
+| Cost-sensitive class sample weights | 新增為主方法 | 用正式的 sample weighting 讓 P1-P5 recall 更平衡 |
+| Recall-balanced validation objective | 保留 | 不只看 accuracy，也看 macro recall、minimum recall、macro F1 與 MAE |
 
-使用目前最佳模型 `improved_priority_p2_keywords_model.joblib` 分析後，兩個目標錯誤方向如下：
-
-| 錯誤方向 | 筆數 |
-|---|---:|
-| P1 Blocker -> P2 Critical | 50 |
-| P4 Minor -> P2 Critical | 23 |
-
-解讀：
-
-- `P1 -> P2` 代表高優先級 bug 被判太輕，會壓低 P1 recall。
-- `P4 -> P2` 代表低優先級 bug 被模型拉太高，表示模型可能過度相信某些 high-priority 訊號。
-
-輸出：
-
-- `reports/targeted_error_directions.csv`
-- `reports/targeted_error_directions.md`
-
-## 2. Recall-Balanced 模型設計
-
-新增模型流程：
+## 2. 新模型流程
 
 ```text
-base DRONE/REP- classifier
+DRONE/REP- feature matrix
+        ↓
+Cost-sensitive base classifier
         ↓
 P1/P2 boundary classifier
         ↓
-P4 false-high suppression
+Recall-balanced validation objective
         ↓
-final prediction P1-P5
+Natural holdout evaluation
 ```
 
-### P1/P2 boundary classifier
+## 3. Cost-Sensitive 設計
 
-用途：
+本版在 base classifier 訓練時搜尋 class-specific sample weights：
 
-- 只針對 base model 預測為 P1 或 P2 的資料再次判斷。
-- 目標是補回 P1 recall，避免 P1 被降成 P2。
+- `base_p1_sample_weight`
+- `base_p2_sample_weight`
+- `base_p4_sample_weight`
 
-### P4 false-high suppression
+並在 P1/P2 boundary classifier 中搜尋：
 
-用途：
+- `boundary_p1_sample_weight`
+- `boundary_p2_sample_weight`
 
-- 只針對目前被預測為 P2 的資料再次判斷是否其實比較像 P4。
-- 目標是降低 `P4 -> P2` 這種低優先級被拉太高的錯誤。
+這樣可以用更標準的機器學習方式處理不同 priority 的 recall 平衡，而不是另外加一個 P2/P4 correction layer。
 
-## 3. Final Objective Grid Search
+## 4. Validation Objective
 
-這次選模不只看 P2 recall，而是改成平衡每個 priority：
+選模目標仍然不是只看 accuracy，而是：
 
 ```text
 macro recall
@@ -70,65 +58,60 @@ macro recall
 
 目的：
 
-- 提升整體 per-class recall 平衡度。
-- 避免只提升某一類，卻讓另一類 recall 崩掉。
-- 特別關注 P1、P4 這兩個原本需要改善的類別。
+- 避免模型只偏向容易判斷的 P3。
+- 避免某一個 priority recall 太低。
+- 同時考慮錯誤是否只差一級。
 
-## 4. 結果比較
+## 5. 結果比較
 
 | 模型 | Accuracy | Macro F1 | Macro Recall | Min Recall | Off-by-one | MAE | P1 Recall | P2 Recall | P3 Recall | P4 Recall | P5 Recall |
 |---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| 目前最佳模型 | 0.7246 | 0.7240 | 0.7244 | 0.6482 | 0.8995 | 0.4090 | 0.6482 | 0.6818 | 0.8750 | 0.6834 | 0.7337 |
-| Recall-balanced 模型 | 0.7317 | 0.7309 | 0.7315 | 0.6583 | 0.9025 | 0.4000 | 0.6583 | 0.6818 | 0.8750 | 0.7085 | 0.7337 |
+| p2 keywords SGD | 0.7246 | 0.7240 | 0.7244 | 0.6482 | 0.8995 | 0.4090 | 0.6482 | 0.6818 | 0.8750 | 0.6834 | 0.7337 |
+| Recall-balanced cost-sensitive | 0.7266 | 0.7265 | 0.7265 | 0.6583 | 0.9045 | 0.4040 | 0.6583 | 0.6869 | 0.8350 | 0.7136 | 0.7387 |
 
-## 5. 主要改善
+## 6. 主要改善
 
-| 指標 | 目前最佳 | Recall-balanced | 變化 |
+| 指標 | 前一版 | 本版 | 變化 |
 |---|---:|---:|---:|
-| Accuracy | 0.7246 | 0.7317 | +0.0070 |
-| Macro F1 | 0.7240 | 0.7309 | +0.0069 |
-| Macro Recall | 0.7244 | 0.7315 | +0.0070 |
+| Accuracy | 0.7246 | 0.7266 | +0.0020 |
+| Macro F1 | 0.7240 | 0.7265 | +0.0025 |
+| Macro Recall | 0.7244 | 0.7265 | +0.0021 |
 | Min Recall | 0.6482 | 0.6583 | +0.0101 |
-| MAE | 0.4090 | 0.4000 | -0.0090 |
+| Off-by-one accuracy | 0.8995 | 0.9045 | +0.0050 |
+| MAE | 0.4090 | 0.4040 | -0.0050 |
 | P1 Recall | 0.6482 | 0.6583 | +0.0101 |
-| P4 Recall | 0.6834 | 0.7085 | +0.0251 |
+| P2 Recall | 0.6818 | 0.6869 | +0.0051 |
+| P4 Recall | 0.6834 | 0.7136 | +0.0302 |
+| P5 Recall | 0.7337 | 0.7387 | +0.0050 |
 
-## 6. 錯誤方向改善
+## 7. 錯誤方向
 
-| 錯誤方向 | 原本 | Recall-balanced | 變化 |
+| 錯誤方向 | 前一版 | 本版 | 變化 |
 |---|---:|---:|---:|
-| P1 -> P2 | 50 | 50 | 0 |
-| P4 -> P2 | 23 | 18 | -5 |
+| P1 -> P2 | 50 | 51 | +1 |
+| P4 -> P2 | 23 | 16 | -7 |
 
 解讀：
 
-- P1 recall 有提升，但主要不是因為 `P1 -> P2` 降低，而是減少了 P1 被錯判到其他類別的情況。
-- P4 false-high suppression 有作用，`P4 -> P2` 從 23 筆降到 18 筆。
-- P4 recall 從 0.6834 提升到 0.7085，是本次最明顯的 per-class recall 改善。
+- P1 -> P2 沒有改善，代表 P1/P2 邊界仍是主要困難點。
+- P4 -> P2 明顯下降，且這次不是靠 P2/P4 correction classifier，而是透過 cost-sensitive base training 與 recall-balanced objective 達成。
+- 本版方法比原本的 local correction 更適合放進報告，因為它是正式的 sample weighting 與 validation objective 設計。
 
-## 7. 結論
+## 8. 結論
 
-Recall-balanced 模型比目前最佳模型更好：
+本版主模型改為 `recall_balanced_cost_sensitive`。雖然 accuracy 比先前含 P2/P4 correction layer 的版本低一些，但方法更正式、較容易向教授說明，也避免把模型設計描述成針對單一錯誤方向的 heuristic。
 
-- 整體 accuracy 更高
-- macro F1 更高
-- macro recall 更高
-- minimum recall 更高
-- MAE 更低
-- P1、P4 recall 都改善，且 P2/P3/P5 recall 沒有下降
+報告建議說法：
 
-因此目前可以把 `recall_balanced_priority_model.joblib` 視為新的最佳實驗模型。報告中可以說明：這次不是單純追求 P2 recall，而是根據 per-class error analysis 針對 P1/P2 與 P4 false-high 問題做局部修正，最後用 macro recall 和 minimum recall 作為更平衡的選模目標。
+> 本次將原本較像局部修正的 P2/P4 correction 移除，改用 cost-sensitive recall-balanced learning。模型透過 class-specific sample weights 與 validation objective 同時考慮 macro recall、minimum recall、macro F1、off-by-one accuracy 與 MAE，使各 priority 的 recall 更平衡。
 
-## 8. 輸出檔案
+## 9. 輸出檔案
 
-- `scripts/analyze_targeted_error_directions.py`
 - `scripts/train_recall_balanced_priority_model.py`
-- `reports/targeted_error_directions.md`
-- `reports/targeted_error_directions_recall_balanced.md`
 - `reports/recall_balanced_priority_model.md`
 - `reports/recall_balanced_best_eval.csv`
 - `reports/recall_balanced_best_class_report.csv`
 - `reports/recall_balanced_grid_search.csv`
 - `reports/recall_balanced_comparison.csv`
 - `reports/per_class_error_analysis_recall_balanced.md`
-
+- `reports/targeted_error_directions_recall_balanced.md`
