@@ -1,3 +1,9 @@
+"""Summarize where each true priority class is misclassified.
+
+此程式用於報告中的 per-class error analysis：讀取目前最佳模型與
+natural_holdout features，輸出每個 priority 的 recall、錯判方向與逐筆錯誤明細。
+"""
+
 import argparse
 import os
 
@@ -82,6 +88,7 @@ def markdown_table(df: pd.DataFrame, limit: int | None = None) -> str:
 
 
 def load_eval_data(args: argparse.Namespace):
+    # 讀取同一個 feature_dir 中的 X/y/meta，meta 用來輸出可讀的錯誤明細。
     X = load_npz(os.path.join(args.feature_dir, "X_features.npz"))
     y = np.load(os.path.join(args.feature_dir, "y.npy"))
     meta = pd.read_csv(os.path.join(args.feature_dir, "feature_meta.csv"))
@@ -99,6 +106,7 @@ def load_eval_data(args: argparse.Namespace):
 
 
 def build_summary(matrix: np.ndarray) -> pd.DataFrame:
+    # confusion matrix 的每一列是真實 priority，每一欄是模型預測 priority。
     rows = []
     for i, true_label in enumerate(LABELS):
         counts = matrix[i]

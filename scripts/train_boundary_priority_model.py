@@ -1,3 +1,9 @@
+"""Utilities and legacy entry point for boundary-refined priority models.
+
+目前主流程不直接執行本檔；`train_recall_balanced_priority_model.py`
+會 import 其中的 `fit_candidate` 與 `class_report_rows` 作為訓練輔助工具。
+"""
+
 import argparse
 import os
 
@@ -185,6 +191,7 @@ def predict_refined(base_model, boundary_model, X, apply_mode: str) -> np.ndarra
 
 
 def fit_candidate(model, X, y, sample_weight=None):
+    # 有些 estimator 不支援 sample_weight；不支援時退回一般 fit。
     if sample_weight is None:
         model.fit(X, y)
         return model

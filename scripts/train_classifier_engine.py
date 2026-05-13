@@ -1,3 +1,9 @@
+"""Shared classifier factory for DRONE/REP- feature matrices.
+
+主訓練程式會透過這裡建立 SGDClassifier、SVM、Logistic Regression、
+XGBoost 或 LightGBM 候選模型，並用 validation set 選出較好的設定。
+"""
+
 import argparse
 import os
 
@@ -88,6 +94,7 @@ def load_features(feature_dir: str):
 
 
 def build_candidates(args: argparse.Namespace):
+    # 依照命令列指定的 model_types 產生候選分類器與參數說明。
     for model_type in parse_str_list(args.model_types):
         if model_type == "linear_svm":
             for c_value in parse_float_list(args.c_values):

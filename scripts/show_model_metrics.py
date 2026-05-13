@@ -1,3 +1,8 @@
+"""Print the main natural_holdout metrics for the current best model.
+
+這支程式只讀取已存在的 evaluation CSV，不會重新訓練或修改模型。
+"""
+
 import argparse
 from pathlib import Path
 

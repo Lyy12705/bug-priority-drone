@@ -1,3 +1,11 @@
+"""Build DRONE/REP- feature matrices for Eclipse Bugzilla priority prediction.
+
+這支程式是整個專題的特徵工程核心：把清洗後的 bug report 轉成
+`X_features.npz`、`y.npy` 和 `feature_meta.csv`。特徵包含文獻中的
+textual、temporal、author、related-report、severity、product/component，
+並額外加入本專題的 error-driven keyword features。
+"""
+
 import os
 import argparse
 import json
@@ -105,14 +113,12 @@ def simple_stem(token: str) -> str:
         if token.endswith(suffix) and len(token) > len(suffix) + 3:
             if suffix == "ies":
                 return token[: -len(suffix)] + "y"
-            if suffix == "s":
-                return token[:-1]
-            return token[: -len(suffix)]
+            return token[:-1] if suffix == "s" else token[: -len(suffix)]
     return token
 
 
 def drone_text_analyzer(text: str) -> list[str]:
-    tokens = TOKEN_RE.findall(str(text))
+    tokens = TOKEN_RE.findall(text)
     return [
         simple_stem(token.lower())
         for token in tokens
@@ -197,7 +203,7 @@ def empty_related_stats() -> dict[str, float]:
             f"related_top{top_k}_high_priority_rate": 0.0,
             f"related_top{top_k}_low_priority_rate": 0.0,
         }
-        row.update(topk_values)
+        row |= topk_values
         for column in topk_values:
             ensure_numeric_col(column)
     return row
@@ -451,10 +457,10 @@ def add_error_driven_features(df: pd.DataFrame) -> pd.DataFrame:
         + feature_values["stack_without_crash_data_loss"]
     )
 
-    for col, values in feature_values.items():
-        df[col] = values
+    feature_df = pd.DataFrame(feature_values, index=df.index)
+    for col in feature_df.columns:
         ensure_numeric_col(col)
-    return df
+    return pd.concat([df, feature_df], axis=1)
 
 
 def compute_topk_related_stats(
@@ -515,7 +521,7 @@ def compute_topk_related_stats(
             f"related_top{top_k}_high_priority_rate": float(np.mean(np.isin(top_priorities, [1, 2]))),
             f"related_top{top_k}_low_priority_rate": float(np.mean(np.isin(top_priorities, [4, 5]))),
         }
-        row.update(topk_values)
+        row |= topk_values
         for column in topk_values:
             ensure_numeric_col(column)
 
@@ -598,6 +604,181 @@ def bm25f_ext_matrices(
         query_weights.data = ((k3 + 1.0) * query_weights.data) / (k3 + query_weights.data)
 
     return document_weights.tocsr(), query_weights.tocsr()
+
+
+def build_enhanced_tfidf_vectorizers() -> dict[str, TfidfVectorizer]:
+    """建立 enhanced text mode 所需的 word/char TF-IDF vectorizers."""
+    return {
+        "combined_word": TfidfVectorizer(
+            max_features=5000,
+            ngram_range=(1, 2),
+            token_pattern=TOKEN_PATTERN,
+            stop_words="english",
+            sublinear_tf=True,
+            min_df=2,
+        ),
+        "summary_word": TfidfVectorizer(
+            max_features=2500,
+            ngram_range=(1, 2),
+            token_pattern=TOKEN_PATTERN,
+            stop_words="english",
+            sublinear_tf=True,
+            min_df=2,
+        ),
+        "description_word": TfidfVectorizer(
+            max_features=4000,
+            ngram_range=(1, 2),
+            token_pattern=TOKEN_PATTERN,
+            stop_words="english",
+            sublinear_tf=True,
+            min_df=2,
+        ),
+        "char": TfidfVectorizer(
+            max_features=3000,
+            analyzer="char_wb",
+            ngram_range=(3, 5),
+            sublinear_tf=True,
+            min_df=2,
+        ),
+    }
+
+
+def enhanced_text_matrix(
+    X_tf,
+    texts: list[str],
+    summaries: list[str],
+    descriptions: list[str],
+    tfidf_ngram_vectorizer: dict[str, TfidfVectorizer] | TfidfVectorizer | None,
+):
+    """Fit/transform enhanced textual features and append them to paper-style TF."""
+    if tfidf_ngram_vectorizer is None:
+        tfidf_ngram_vectorizer = build_enhanced_tfidf_vectorizers()
+        X_combined_word = tfidf_ngram_vectorizer["combined_word"].fit_transform(texts)
+        X_summary_word = tfidf_ngram_vectorizer["summary_word"].fit_transform(summaries)
+        X_description_word = tfidf_ngram_vectorizer["description_word"].fit_transform(descriptions)
+        X_char = tfidf_ngram_vectorizer["char"].fit_transform(texts)
+    elif isinstance(tfidf_ngram_vectorizer, dict):
+        X_combined_word = tfidf_ngram_vectorizer["combined_word"].transform(texts)
+        X_summary_word = tfidf_ngram_vectorizer["summary_word"].transform(summaries)
+        X_description_word = tfidf_ngram_vectorizer["description_word"].transform(descriptions)
+        X_char = tfidf_ngram_vectorizer["char"].transform(texts)
+    else:
+        # Backward compatibility for older enhanced feature directories.
+        X_combined_word = tfidf_ngram_vectorizer.transform(texts)
+        X_summary_word = csr_matrix((len(texts), 0))
+        X_description_word = csr_matrix((len(texts), 0))
+        X_char = csr_matrix((len(texts), 0))
+
+    X_text = hstack([
+        X_tf,
+        X_combined_word,
+        weighted_tfidf(X_summary_word, 1.5),
+        weighted_tfidf(X_description_word, 0.8),
+        weighted_tfidf(X_char, 0.5),
+    ]).tocsr()
+    return tfidf_ngram_vectorizer, X_text
+
+
+def build_rep_minus_matrices(
+    vectorizer: CountVectorizer,
+    rep_bigram_vectorizer: CountVectorizer | None,
+    summaries: list[str],
+    descriptions: list[str],
+    rep_summary_weight: float,
+    rep_description_weight: float,
+    rep_bigram_summary_weight: float,
+    rep_bigram_description_weight: float,
+    rep_k1_unigram: float,
+    rep_k3_unigram: float,
+    rep_summary_b_unigram: float,
+    rep_description_b_unigram: float,
+    rep_k1_bigram: float,
+    rep_k3_bigram: float,
+    rep_summary_b_bigram: float,
+    rep_description_b_bigram: float,
+):
+    """Build REP- BM25Fext unigram/bigram matrices used for historical similarity."""
+    if rep_bigram_vectorizer is None:
+        rep_bigram_vectorizer = CountVectorizer(
+            max_features=3000,
+            analyzer=drone_bigram_analyzer,
+        )
+        rep_bigram_vectorizer.fit([f"{summary} {description}" for summary, description in zip(summaries, descriptions)])
+
+    X_summary_uni = vectorizer.transform(summaries)
+    X_description_uni = vectorizer.transform(descriptions)
+    X_doc_uni, X_query_uni = bm25f_ext_matrices(
+        X_summary_uni,
+        X_description_uni,
+        summary_weight=rep_summary_weight,
+        description_weight=rep_description_weight,
+        summary_b=rep_summary_b_unigram,
+        description_b=rep_description_b_unigram,
+        k1=rep_k1_unigram,
+        k3=rep_k3_unigram,
+    )
+
+    X_summary_bi = rep_bigram_vectorizer.transform(summaries)
+    X_description_bi = rep_bigram_vectorizer.transform(descriptions)
+    X_doc_bi, X_query_bi = bm25f_ext_matrices(
+        X_summary_bi,
+        X_description_bi,
+        summary_weight=rep_bigram_summary_weight,
+        description_weight=rep_bigram_description_weight,
+        summary_b=rep_summary_b_bigram,
+        description_b=rep_description_b_bigram,
+        k1=rep_k1_bigram,
+        k3=rep_k3_bigram,
+    )
+    return rep_bigram_vectorizer, X_doc_uni, X_query_uni, X_doc_bi, X_query_bi
+
+
+def build_related_feature_rows(
+    df: pd.DataFrame,
+    related_mode: str,
+    products: np.ndarray,
+    components: np.ndarray,
+    severities: np.ndarray,
+    rep_matrices: tuple | None,
+    X_related,
+    rep_unigram_feature_weight: float,
+    rep_bigram_feature_weight: float,
+    rep_product_weight: float,
+    rep_component_weight: float,
+    rep_severity_weight: float,
+) -> list[dict[str, float]]:
+    """Compute top-k historical related-report statistics for each target report."""
+    related_feature_rows = []
+    for i in range(len(df)):
+        if i == 0:
+            related_feature_rows.append(empty_related_stats())
+            continue
+
+        if related_mode == "rep_minus":
+            X_doc_uni, X_query_uni, X_doc_bi, X_query_bi = rep_matrices
+            unigram_sims = (X_query_uni[i] @ X_doc_uni[:i].T).toarray().ravel()
+            bigram_sims = (X_query_bi[i] @ X_doc_bi[:i].T).toarray().ravel()
+            sims = (
+                rep_unigram_feature_weight * unigram_sims
+                + rep_bigram_feature_weight * bigram_sims
+                + rep_product_weight * (products[:i] == products[i])
+                + rep_component_weight * (components[:i] == components[i])
+                + rep_severity_weight * (severities[:i] == severities[i])
+            )
+        else:
+            sims = (X_related[i] @ X_related[:i].T).toarray().ravel()
+
+        prev_priorities = df.iloc[:i]["priority_num"].to_numpy()
+        related_feature_rows.append(
+            compute_topk_related_stats(
+                prev_priorities,
+                sims,
+                same_product=(products[:i] == products[i]).astype(float),
+                same_component=(components[:i] == components[i]).astype(float),
+                same_severity=(severities[:i] == severities[i]).astype(float),
+            )
+        )
+    return related_feature_rows
 
 
 def add_author_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -802,142 +983,61 @@ def add_related_report_features(
         X_tf = vectorizer.transform(texts)
 
     if text_feature_mode == "enhanced":
-        if tfidf_ngram_vectorizer is None:
-            tfidf_ngram_vectorizer = {
-                "combined_word": TfidfVectorizer(
-                    max_features=5000,
-                    ngram_range=(1, 2),
-                    token_pattern=TOKEN_PATTERN,
-                    stop_words="english",
-                    sublinear_tf=True,
-                    min_df=2,
-                ),
-                "summary_word": TfidfVectorizer(
-                    max_features=2500,
-                    ngram_range=(1, 2),
-                    token_pattern=TOKEN_PATTERN,
-                    stop_words="english",
-                    sublinear_tf=True,
-                    min_df=2,
-                ),
-                "description_word": TfidfVectorizer(
-                    max_features=4000,
-                    ngram_range=(1, 2),
-                    token_pattern=TOKEN_PATTERN,
-                    stop_words="english",
-                    sublinear_tf=True,
-                    min_df=2,
-                ),
-                "char": TfidfVectorizer(
-                    max_features=3000,
-                    analyzer="char_wb",
-                    ngram_range=(3, 5),
-                    sublinear_tf=True,
-                    min_df=2,
-                ),
-            }
-            X_combined_word = tfidf_ngram_vectorizer["combined_word"].fit_transform(texts)
-            X_summary_word = tfidf_ngram_vectorizer["summary_word"].fit_transform(summaries)
-            X_description_word = tfidf_ngram_vectorizer["description_word"].fit_transform(descriptions)
-            X_char = tfidf_ngram_vectorizer["char"].fit_transform(texts)
-        else:
-            if isinstance(tfidf_ngram_vectorizer, dict):
-                X_combined_word = tfidf_ngram_vectorizer["combined_word"].transform(texts)
-                X_summary_word = tfidf_ngram_vectorizer["summary_word"].transform(summaries)
-                X_description_word = tfidf_ngram_vectorizer["description_word"].transform(descriptions)
-                X_char = tfidf_ngram_vectorizer["char"].transform(texts)
-            else:
-                # Backward compatibility for older enhanced feature directories.
-                X_combined_word = tfidf_ngram_vectorizer.transform(texts)
-                X_summary_word = csr_matrix((len(texts), 0))
-                X_description_word = csr_matrix((len(texts), 0))
-                X_char = csr_matrix((len(texts), 0))
-        X_text = hstack([
+        tfidf_ngram_vectorizer, X_text = enhanced_text_matrix(
             X_tf,
-            X_combined_word,
-            weighted_tfidf(X_summary_word, 1.5),
-            weighted_tfidf(X_description_word, 0.8),
-            weighted_tfidf(X_char, 0.5),
-        ]).tocsr()
+            texts,
+            summaries,
+            descriptions,
+            tfidf_ngram_vectorizer,
+        )
     else:
         X_text = X_tf
 
     if related_mode == "rep_minus":
-        if rep_bigram_vectorizer is None:
-            rep_bigram_vectorizer = CountVectorizer(
-                max_features=3000,
-                analyzer=drone_bigram_analyzer,
-            )
-            rep_bigram_vectorizer.fit([f"{summary} {description}" for summary, description in zip(summaries, descriptions)])
-
-        X_summary_uni = vectorizer.transform(summaries)
-        X_description_uni = vectorizer.transform(descriptions)
-        X_doc_uni, X_query_uni = bm25f_ext_matrices(
-            X_summary_uni,
-            X_description_uni,
-            summary_weight=rep_summary_weight,
-            description_weight=rep_description_weight,
-            summary_b=rep_summary_b_unigram,
-            description_b=rep_description_b_unigram,
-            k1=rep_k1_unigram,
-            k3=rep_k3_unigram,
+        rep_bigram_vectorizer, X_doc_uni, X_query_uni, X_doc_bi, X_query_bi = build_rep_minus_matrices(
+            vectorizer,
+            rep_bigram_vectorizer,
+            summaries,
+            descriptions,
+            rep_summary_weight,
+            rep_description_weight,
+            rep_bigram_summary_weight,
+            rep_bigram_description_weight,
+            rep_k1_unigram,
+            rep_k3_unigram,
+            rep_summary_b_unigram,
+            rep_description_b_unigram,
+            rep_k1_bigram,
+            rep_k3_bigram,
+            rep_summary_b_bigram,
+            rep_description_b_bigram,
         )
-
-        X_summary_bi = rep_bigram_vectorizer.transform(summaries)
-        X_description_bi = rep_bigram_vectorizer.transform(descriptions)
-        X_doc_bi, X_query_bi = bm25f_ext_matrices(
-            X_summary_bi,
-            X_description_bi,
-            summary_weight=rep_bigram_summary_weight,
-            description_weight=rep_bigram_description_weight,
-            summary_b=rep_summary_b_bigram,
-            description_b=rep_description_b_bigram,
-            k1=rep_k1_bigram,
-            k3=rep_k3_bigram,
-        )
+        rep_matrices = (X_doc_uni, X_query_uni, X_doc_bi, X_query_bi)
         X_related = None
     else:
+        rep_matrices = None
         X_related = bm25_document_matrix(X_tf)
 
     products = df["product"].astype(str).to_numpy()
     components = df["component"].astype(str).to_numpy()
     severities = df["severity"].astype(str).str.lower().to_numpy()
-    related_feature_rows = []
+    related_feature_rows = build_related_feature_rows(
+        df,
+        related_mode,
+        products,
+        components,
+        severities,
+        rep_matrices,
+        X_related,
+        rep_unigram_feature_weight,
+        rep_bigram_feature_weight,
+        rep_product_weight,
+        rep_component_weight,
+        rep_severity_weight,
+    )
 
-    for i in range(len(texts)):
-        if i == 0:
-            related_feature_rows.append(empty_related_stats())
-            continue
-
-        if related_mode == "rep_minus":
-            unigram_sims = (X_query_uni[i] @ X_doc_uni[:i].T).toarray().ravel()
-            bigram_sims = (X_query_bi[i] @ X_doc_bi[:i].T).toarray().ravel()
-            sims = (
-                rep_unigram_feature_weight * unigram_sims
-                + rep_bigram_feature_weight * bigram_sims
-                + rep_product_weight * (products[:i] == products[i])
-                + rep_component_weight * (components[:i] == components[i])
-                + rep_severity_weight * (severities[:i] == severities[i])
-            )
-        else:
-            current_vec = X_related[i]
-            historical_matrix = X_related[:i]
-            sims = (current_vec @ historical_matrix.T).toarray().ravel()
-        prev_priorities = df.iloc[:i]["priority_num"].to_numpy()
-        related_feature_rows.append(
-            compute_topk_related_stats(
-                prev_priorities,
-                sims,
-                same_product=(products[:i] == products[i]).astype(float),
-                same_component=(components[:i] == components[i]).astype(float),
-                same_severity=(severities[:i] == severities[i]).astype(float),
-            )
-        )
-
-    related_df = pd.DataFrame(related_feature_rows)
-
-    for col in related_df.columns:
-        df[col] = related_df[col].values
+    related_df = pd.DataFrame(related_feature_rows, index=df.index)
+    df = pd.concat([df, related_df], axis=1)
 
     return df, vectorizer, rep_bigram_vectorizer, tfidf_ngram_vectorizer, X_text
 
@@ -1036,27 +1136,23 @@ def apply_rep_weight_config(args: argparse.Namespace) -> argparse.Namespace:
     return args
 
 
-def main():
-    args = apply_rep_weight_config(build_parser().parse_args())
-    feature_dir = args.feature_dir
-    ensure_dir(feature_dir)
+def feature_artifact_paths(args: argparse.Namespace, feature_dir: str) -> dict[str, str]:
+    """Resolve output paths and reference artifact paths for fit/transform modes."""
+    artifact_dir = args.reference_feature_dir if args.mode == "transform" else feature_dir
+    return {
+        "text_vectorizer": os.path.join(artifact_dir, "tf_vectorizer.joblib"),
+        "tfidf_ngram_vectorizer": os.path.join(artifact_dir, "tfidf_ngram_vectorizer.joblib"),
+        "rep_bigram_vectorizer": os.path.join(artifact_dir, "rep_bigram_vectorizer.joblib"),
+        "meta_encoder": os.path.join(artifact_dir, "meta_encoder.joblib"),
+        "numeric_scaler": os.path.join(artifact_dir, "numeric_scaler.joblib"),
+        "x": os.path.join(feature_dir, "X_features.npz"),
+        "y": os.path.join(feature_dir, "y.npy"),
+        "meta": os.path.join(feature_dir, "feature_meta.csv"),
+    }
 
-    text_vectorizer_path = os.path.join(feature_dir, "tf_vectorizer.joblib")
-    tfidf_ngram_vectorizer_path = os.path.join(feature_dir, "tfidf_ngram_vectorizer.joblib")
-    rep_bigram_vectorizer_path = os.path.join(feature_dir, "rep_bigram_vectorizer.joblib")
-    meta_encoder_path = os.path.join(feature_dir, "meta_encoder.joblib")
-    numeric_scaler_path = os.path.join(feature_dir, "numeric_scaler.joblib")
-    x_path = os.path.join(feature_dir, "X_features.npz")
-    y_path = os.path.join(feature_dir, "y.npy")
-    meta_path = os.path.join(feature_dir, "feature_meta.csv")
 
-    if args.mode == "transform":
-        text_vectorizer_path = os.path.join(args.reference_feature_dir, "tf_vectorizer.joblib")
-        tfidf_ngram_vectorizer_path = os.path.join(args.reference_feature_dir, "tfidf_ngram_vectorizer.joblib")
-        rep_bigram_vectorizer_path = os.path.join(args.reference_feature_dir, "rep_bigram_vectorizer.joblib")
-        meta_encoder_path = os.path.join(args.reference_feature_dir, "meta_encoder.joblib")
-        numeric_scaler_path = os.path.join(args.reference_feature_dir, "numeric_scaler.joblib")
-
+def load_feature_dataframe(args: argparse.Namespace) -> pd.DataFrame:
+    """Load target rows and optional history rows, then sort by creation_time."""
     df = pd.read_csv(args.input)
     df["__is_target"] = True
 
@@ -1069,7 +1165,28 @@ def main():
         df = pd.concat([history_df, df], ignore_index=True)
 
     df["creation_time"] = pd.to_datetime(df["creation_time"], errors="coerce")
-    df = df.dropna(subset=["creation_time"]).sort_values("creation_time").reset_index(drop=True)
+    return df.dropna(subset=["creation_time"]).sort_values("creation_time").reset_index(drop=True)
+
+
+def load_transform_artifacts(args: argparse.Namespace, paths: dict[str, str]):
+    """Load fitted vectorizers/encoders when transforming validation or holdout data."""
+    if args.mode != "transform":
+        return None, None, None
+
+    text_vectorizer = joblib.load(paths["text_vectorizer"])
+    rep_bigram_vectorizer = joblib.load(paths["rep_bigram_vectorizer"]) if args.related_mode == "rep_minus" else None
+    tfidf_ngram_vectorizer = (
+        joblib.load(paths["tfidf_ngram_vectorizer"]) if args.text_feature_mode == "enhanced" else None
+    )
+    return text_vectorizer, rep_bigram_vectorizer, tfidf_ngram_vectorizer
+
+
+def main():
+    args = apply_rep_weight_config(build_parser().parse_args())
+    feature_dir = args.feature_dir
+    ensure_dir(feature_dir)
+    paths = feature_artifact_paths(args, feature_dir)
+    df = load_feature_dataframe(args)
 
     # 1. Author factor
     df = add_author_features(df)
@@ -1081,15 +1198,7 @@ def main():
     df = add_error_driven_features(df)
 
     # 3. Related-report factor + Textual factor
-    text_vectorizer = None
-    rep_bigram_vectorizer = None
-    tfidf_ngram_vectorizer = None
-    if args.mode == "transform":
-        text_vectorizer = joblib.load(text_vectorizer_path)
-        if args.related_mode == "rep_minus":
-            rep_bigram_vectorizer = joblib.load(rep_bigram_vectorizer_path)
-        if args.text_feature_mode == "enhanced":
-            tfidf_ngram_vectorizer = joblib.load(tfidf_ngram_vectorizer_path)
+    text_vectorizer, rep_bigram_vectorizer, tfidf_ngram_vectorizer = load_transform_artifacts(args, paths)
     df, text_vectorizer, rep_bigram_vectorizer, tfidf_ngram_vectorizer, X_text = add_related_report_features(
         df,
         vectorizer=text_vectorizer,
@@ -1127,7 +1236,7 @@ def main():
         encoder = OneHotEncoder(handle_unknown="ignore", sparse_output=True)
         X_cat = encoder.fit_transform(df[cat_cols])
     else:
-        encoder = joblib.load(meta_encoder_path)
+        encoder = joblib.load(paths["meta_encoder"])
         X_cat = encoder.transform(df[cat_cols])
 
     # 5. Numeric features
@@ -1135,13 +1244,12 @@ def main():
     if args.mode == "fit":
         numeric_scaler = StandardScaler(with_mean=False)
         numeric_values = numeric_scaler.fit_transform(numeric_values)
+    elif os.path.exists(paths["numeric_scaler"]):
+        numeric_scaler = joblib.load(paths["numeric_scaler"])
+        numeric_values = numeric_scaler.transform(numeric_values)
     else:
-        if os.path.exists(numeric_scaler_path):
-            numeric_scaler = joblib.load(numeric_scaler_path)
-            numeric_values = numeric_scaler.transform(numeric_values)
-        else:
-            numeric_scaler = None
-            print("warning: numeric_scaler.joblib not found; numeric features are left unscaled.")
+        numeric_scaler = None
+        print("warning: numeric_scaler.joblib not found; numeric features are left unscaled.")
 
     X_num = csr_matrix(numeric_values)
     print(f"using {len(NUMERIC_COLS)} numeric features")
@@ -1150,25 +1258,25 @@ def main():
     X_all = hstack([X_text, X_cat, X_num]).tocsr()
     y = df["priority_num"].values
 
-    save_npz(x_path, X_all)
-    np.save(y_path, y)
+    save_npz(paths["x"], X_all)
+    np.save(paths["y"], y)
 
     if args.mode == "fit":
-        joblib.dump(text_vectorizer, text_vectorizer_path)
+        joblib.dump(text_vectorizer, paths["text_vectorizer"])
         if args.related_mode == "rep_minus":
-            joblib.dump(rep_bigram_vectorizer, rep_bigram_vectorizer_path)
+            joblib.dump(rep_bigram_vectorizer, paths["rep_bigram_vectorizer"])
         if args.text_feature_mode == "enhanced":
-            joblib.dump(tfidf_ngram_vectorizer, tfidf_ngram_vectorizer_path)
-        joblib.dump(encoder, meta_encoder_path)
-        joblib.dump(numeric_scaler, numeric_scaler_path)
+            joblib.dump(tfidf_ngram_vectorizer, paths["tfidf_ngram_vectorizer"])
+        joblib.dump(encoder, paths["meta_encoder"])
+        joblib.dump(numeric_scaler, paths["numeric_scaler"])
 
-    df.to_csv(meta_path, index=False, encoding="utf-8-sig")
+    df.to_csv(paths["meta"], index=False, encoding="utf-8-sig")
 
     print(f"X shape = {X_all.shape}")
     print(f"y shape = {y.shape}")
-    print(f"saved features -> {x_path}")
-    print(f"saved labels   -> {y_path}")
-    print(f"saved meta     -> {meta_path}")
+    print(f"saved features -> {paths['x']}")
+    print(f"saved labels   -> {paths['y']}")
+    print(f"saved meta     -> {paths['meta']}")
 
 
 if __name__ == "__main__":

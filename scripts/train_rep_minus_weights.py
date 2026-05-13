@@ -1,3 +1,9 @@
+"""Train REP- related-report weights from Bugzilla duplicate links.
+
+若 bug A 的 `dupe_of` 指向 bug B，程式會把 A/B 視為 related pair，
+再用非 duplicate 歷史 bug 當 negative samples，學習 REP- 相似度特徵權重。
+"""
+
 import argparse
 import json
 import os
@@ -104,6 +110,7 @@ def pair_feature(
     components: np.ndarray,
     severities: np.ndarray,
 ) -> np.ndarray:
+    # 每個 duplicate/non-duplicate pair 轉成 REP- 訓練用的五個相似度訊號。
     unigram = float((X_query_uni[query_idx] @ X_doc_uni[doc_idx].T).toarray()[0, 0])
     bigram = float((X_query_bi[query_idx] @ X_doc_bi[doc_idx].T).toarray()[0, 0])
     same_product = float(products[query_idx] == products[doc_idx])

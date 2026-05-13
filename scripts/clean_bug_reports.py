@@ -1,3 +1,9 @@
+"""Clean raw Eclipse Bugzilla records before feature extraction.
+
+輸入是 `fetch_eclipse_bugzilla.py` 產生的 raw CSV；輸出是後續 split、
+REP- 權重訓練與 feature extraction 共用的 cleaned CSV。
+"""
+
 import re
 import argparse
 import os

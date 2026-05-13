@@ -1,3 +1,9 @@
+"""Train the current cost-sensitive recall-balanced priority model.
+
+這是目前 GitHub 主模型訓練程式：先訓練 cost-sensitive base classifier，
+再加上 P1/P2 boundary refinement，最後用 validation objective 選出最佳模型。
+"""
+
 import argparse
 import os
 
@@ -89,6 +95,7 @@ def metric_row(y_true: np.ndarray, y_pred: np.ndarray, eval_set: str) -> dict:
 
 
 def selection_objective(row: dict, args: argparse.Namespace) -> float:
+    # 選模不只看 accuracy，也獎勵 macro/min recall 並懲罰 MAE 與低 recall。
     floors = {
         "p1_recall": args.p1_floor,
         "p2_recall": args.p2_floor,
@@ -109,6 +116,7 @@ def selection_objective(row: dict, args: argparse.Namespace) -> float:
 
 
 def predict_recall_balanced(bundle: dict, X) -> np.ndarray:
+    # 先用五分類 base model 預測；只有 P1/P2 預測再交給 boundary model 細分。
     y_pred = bundle["base_model"].predict(X).astype(int)
 
     p1p2_model = bundle.get("p1p2_model")

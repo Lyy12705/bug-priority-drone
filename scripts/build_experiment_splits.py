@@ -1,3 +1,9 @@
+"""Create train/validation/natural_holdout splits for the priority model.
+
+流程上先保留 natural_holdout 作為最終測試集，再用剩餘資料建立較均衡的
+train_balanced 與 validation_balanced，避免模型只偏向資料量較多的類別。
+"""
+
 import argparse
 import os
 
@@ -45,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def safe_stratified_split(df: pd.DataFrame, test_size: float, random_state: int):
+    # 若各 priority 數量足夠，保留分層抽樣以維持 natural_holdout 分布。
     counts = df["priority"].value_counts()
     stratify = df["priority"] if len(counts) > 1 and counts.min() >= 2 else None
     return train_test_split(df, test_size=test_size, random_state=random_state, stratify=stratify)
@@ -84,6 +91,7 @@ def split_balanced_by_priority(
     validation_per_class: int,
     random_state: int,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    # 每個 priority 獨立抽取固定上限，降低多數類別主導訓練的風險。
     train_parts = []
     validation_parts = []
 

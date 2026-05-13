@@ -1,3 +1,9 @@
+"""Fetch Eclipse Bugzilla reports for P1-P5 priority prediction.
+
+此程式依 priority 分批抓取 Eclipse Bugzilla metadata，並額外抓第一則
+comment 作為 description。只使用第一則 comment 是為了避免後續修復討論造成資料洩漏。
+"""
+
 import argparse
 import os
 import time
@@ -43,6 +49,7 @@ def get_with_retries(
     retries: int = 2,
     retry_sleep: float = 1.0,
 ) -> requests.Response:
+    # Bugzilla 偶爾會回 5xx；retry 可避免長時間抓資料中途失敗。
     last_error: requests.RequestException | None = None
     for attempt in range(retries + 1):
         try:
@@ -95,6 +102,7 @@ def fetch_first_comment(
     retries: int = 2,
     retry_sleep: float = 1.0,
 ) -> tuple[str, str, str]:
+    # 優先使用 REST comment API；若失敗，再用 XML endpoint 抓第一則描述。
     rest_error = ""
     try:
         data = request_json(

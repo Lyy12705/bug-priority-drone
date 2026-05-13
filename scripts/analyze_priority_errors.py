@@ -1,3 +1,9 @@
+"""Export selected priority prediction errors for manual diagnosis.
+
+預設會匯出真實 P2 但被判成 P1/P3 的案例，方便觀察 P2 邊界錯誤。
+也可以透過參數改成分析其他 true/predicted priority 組合。
+"""
+
 import argparse
 import os
 
@@ -88,6 +94,7 @@ def predict_hierarchical_drone_gray(model_or_bundle: dict, X) -> np.ndarray:
 
 
 def predict_model_or_bundle(model_or_bundle, X) -> np.ndarray:
+    # 兼容專案歷史上使用過的不同模型 bundle；目前主模型走 recall_balanced_cost_sensitive。
     if not isinstance(model_or_bundle, dict):
         raise TypeError("Expected a DRONE/GRAY model bundle.")
 

@@ -1,3 +1,9 @@
+"""Analyze hand-picked error directions such as P1->P2 and P4->P2.
+
+這支程式不是訓練模型，而是把指定錯誤方向抽出來，統計 severity、product、
+component、keyword signals 和 related-report signals，幫助後續改良模型。
+"""
+
 import argparse
 import os
 
@@ -74,6 +80,7 @@ def load_data(args: argparse.Namespace):
 
 
 def add_signal_flags(df: pd.DataFrame) -> pd.DataFrame:
+    # 將多個原始欄位整理成較容易報告的 high/low impact signals。
     df = df.copy()
     severity = df.get("severity", pd.Series("", index=df.index)).fillna("").astype(str).str.lower()
     product = df.get("product", pd.Series("", index=df.index)).fillna("").astype(str).str.lower()
