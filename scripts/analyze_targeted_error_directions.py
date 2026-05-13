@@ -20,7 +20,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Analyze specific misclassification directions such as P1->P2 and P4->P2.",
     )
-    parser.add_argument("--model", default=project_path("models/improved_priority_p2_keywords_model.joblib"))
+    parser.add_argument("--model", default=project_path("models/recall_balanced_priority_model.joblib"))
     parser.add_argument("--feature-dir", default=project_path("data/processed/features_bm25_p2_error_keywords_natural_test"))
     parser.add_argument("--train-feature-dir", default=project_path("data/processed/features_bm25_p2_error_keywords_train"))
     parser.add_argument(
@@ -28,8 +28,8 @@ def build_parser() -> argparse.ArgumentParser:
         default="1:2,4:2",
         help="Comma-separated true:predicted directions, e.g. 1:2,4:2.",
     )
-    parser.add_argument("--output-csv", default=project_path("reports/targeted_error_directions.csv"))
-    parser.add_argument("--summary-md", default=project_path("reports/targeted_error_directions.md"))
+    parser.add_argument("--output-csv", default=project_path("reports/targeted_error_directions_recall_balanced.csv"))
+    parser.add_argument("--summary-md", default=project_path("reports/targeted_error_directions_recall_balanced.md"))
     parser.add_argument("--keep-overlap", action="store_true")
     return parser
 

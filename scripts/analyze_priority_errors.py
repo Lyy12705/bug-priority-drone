@@ -8,10 +8,10 @@ from scipy.sparse import load_npz
 from sklearn.metrics import confusion_matrix
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-FEATURE_DIR = os.path.join(PROJECT_ROOT, "data", "processed", "features_natural_test")
-TRAIN_FEATURE_DIR = os.path.join(PROJECT_ROOT, "data", "processed", "features_train_balanced")
-MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "drone_gray_model.joblib")
-OUTPUT_PATH = os.path.join(PROJECT_ROOT, "reports", "p2_error_analysis.csv")
+FEATURE_DIR = os.path.join(PROJECT_ROOT, "data", "processed", "features_bm25_p2_error_keywords_natural_test")
+TRAIN_FEATURE_DIR = os.path.join(PROJECT_ROOT, "data", "processed", "features_bm25_p2_error_keywords_train")
+MODEL_PATH = os.path.join(PROJECT_ROOT, "models", "recall_balanced_priority_model.joblib")
+OUTPUT_PATH = os.path.join(PROJECT_ROOT, "reports", "p2_error_analysis_recall_balanced.csv")
 
 LABELS = np.array([1, 2, 3, 4, 5])
 PRIORITY_NAMES = {

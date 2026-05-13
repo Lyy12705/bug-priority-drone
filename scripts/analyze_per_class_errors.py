@@ -22,7 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--model",
-        default=project_path("models/improved_priority_p2_keywords_model.joblib"),
+        default=project_path("models/recall_balanced_priority_model.joblib"),
         help="Saved model bundle to evaluate.",
     )
     parser.add_argument(
@@ -37,22 +37,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--summary-csv",
-        default=project_path("reports/per_class_error_summary.csv"),
+        default=project_path("reports/per_class_error_summary_recall_balanced.csv"),
         help="Per-class summary CSV output.",
     )
     parser.add_argument(
         "--destinations-csv",
-        default=project_path("reports/per_class_error_destinations.csv"),
+        default=project_path("reports/per_class_error_destinations_recall_balanced.csv"),
         help="Per-class wrong-prediction destination CSV output.",
     )
     parser.add_argument(
         "--details-csv",
-        default=project_path("reports/per_class_error_details.csv"),
+        default=project_path("reports/per_class_error_details_recall_balanced.csv"),
         help="Row-level misclassification details CSV output.",
     )
     parser.add_argument(
         "--summary-md",
-        default=project_path("reports/per_class_error_analysis.md"),
+        default=project_path("reports/per_class_error_analysis_recall_balanced.md"),
         help="Markdown report output.",
     )
     parser.add_argument("--keep-overlap", action="store_true", help="Do not remove rows also present in training metadata.")
